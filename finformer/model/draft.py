@@ -10,6 +10,7 @@ import os
 
 from finformer.data.alphavantage import get_data, get_dataloaders
 
+
 class Trainer:
 
     def __init__(
