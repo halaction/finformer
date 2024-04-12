@@ -37,15 +37,15 @@ def main():
 
     os.makedirs(DATA_PATH, exist_ok=True)
 
-    with open(os.path.join(DATA_PATH, 'tickers.json'), 'r', encoding='utf-8') as file:
+    with open(os.path.join(DATA_PATH, 'tickers_nasdaq.json'), 'r', encoding='utf-8') as file:
         tickers = json.load(file)['tickers']
 
-    record_path = os.path.join(DATA_PATH, 'record.json')
-    if os.path.exists(record_path):
-        with open(record_path, 'r', encoding='utf-8') as file:
-            record = json.load(file)
-    else:
-        record = {ticker: [] for ticker in tickers}
+    # record_path = os.path.join(DATA_PATH, 'record.json')
+    # if os.path.exists(record_path):
+    #     with open(record_path, 'r', encoding='utf-8') as file:
+    #         record = json.load(file)
+    # else:
+    #     record = {ticker: [] for ticker in tickers}
 
     year_start = 2022
     year_end = 2024
@@ -83,7 +83,8 @@ def main():
             print(f'ticker: {ticker}')
             print(f'date_interval_str: {date_interval_str}')
 
-            if date_interval_str in record[ticker]:
+            # if date_interval_str in record[ticker]:
+            if os.path.exists(query_path):
                 print('Query has already been completed. Continuing...')
                 continue
 
@@ -112,7 +113,7 @@ def main():
                     with open(query_path, 'w', encoding='utf-8') as file:
                         json.dump(data, file, indent=2)
 
-                    record[ticker].append(date_interval_str)
+                    # record[ticker].append(date_interval_str)
 
                     break
 
@@ -127,8 +128,8 @@ def main():
                 if API_KEY_IDX >= len(API_KEYS) - 1:
                     print('Failed! All API keys were tried. Finishing...')
 
-                    with open(record_path, 'w', encoding='utf-8') as file:
-                        json.dump(record, file, indent=2)
+                    # with open(record_path, 'w', encoding='utf-8') as file:
+                    #     json.dump(record, file, indent=2)
 
                     return None
 
