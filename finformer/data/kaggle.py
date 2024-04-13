@@ -9,24 +9,25 @@ from tqdm import tqdm
 
 load_dotenv()
 
-DATA_PATH = './data'
+DATA_DIR = './data'
+KAGGLE_DIR = os.path.join(DATA_DIR, 'kaggle')
 
-source_news_path = os.path.join(DATA_PATH, 'analyst_ratings_processed.csv')
-news_path = os.path.join(DATA_PATH, 'data-news.csv')
-news_tickers_path = os.path.join(DATA_PATH, 'data-news-tickers.json')
+os.makedirs(KAGGLE_DIR, exist_ok=True)
 
-source_prices_path = os.path.join(DATA_PATH, 'archive-prices')
-prices_path = os.path.join(DATA_PATH, 'data-prices.csv')
-prices_tickers_path = os.path.join(DATA_PATH, 'data-prices-tickers.json')
+source_news_path = os.path.join(KAGGLE_DIR, 'archive-news/analyst_ratings_processed.csv')
+news_path = os.path.join(KAGGLE_DIR, 'data-news.csv')
+news_tickers_path = os.path.join(KAGGLE_DIR, 'data-news-tickers.json')
 
-news_intersection_path = os.path.join(DATA_PATH, 'data-news-intersection.csv')
-prices_intersection_path = os.path.join(DATA_PATH, 'data-prices-intersection.csv')
-intersection_tickers_path = os.path.join(DATA_PATH, 'data-intersection-tickers.json')
+source_prices_path = os.path.join(KAGGLE_DIR, 'archive-prices')
+prices_path = os.path.join(KAGGLE_DIR, 'data-prices.csv')
+prices_tickers_path = os.path.join(KAGGLE_DIR, 'data-prices-tickers.json')
+
+news_intersection_path = os.path.join(KAGGLE_DIR, 'data-news-intersection.csv')
+prices_intersection_path = os.path.join(KAGGLE_DIR, 'data-prices-intersection.csv')
+intersection_tickers_path = os.path.join(KAGGLE_DIR, 'data-intersection-tickers.json')
 
 
 def get_data_news(min_count: int = 300):
-
-    os.makedirs(DATA_PATH, exist_ok=True)
 
     df_news_original = pd.read_csv(source_news_path)
 
@@ -58,8 +59,6 @@ def get_data_news(min_count: int = 300):
 
 def get_data_prices():
 
-    os.makedirs(DATA_PATH, exist_ok=True)
-
     df_prices = None
     filename_list = os.listdir(source_prices_path)
 
@@ -90,8 +89,6 @@ def get_data_prices():
 
 
 def get_data():
-
-    os.makedirs(DATA_PATH, exist_ok=True)
 
     if not (os.path.exists(news_path) and os.path.exists(news_tickers_path)):
         df_news, df_news_tickers = get_data_news()

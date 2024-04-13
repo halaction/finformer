@@ -8,6 +8,19 @@ from dateutil.relativedelta import relativedelta
 from time import sleep
 
 
+load_dotenv()
+
+API_KEYS = os.environ['ALPHAVANTAGE_API_KEYS'].split(',')
+API_KEY_IDX = 0
+
+DATA_DIR = './data'
+ALPHAVANTAGE_DIR = os.path.join(DATA_DIR, 'alphavantage')
+NASDAQ_DIR = os.path.join(DATA_DIR, 'nasdaq')
+
+os.makedirs(ALPHAVANTAGE_DIR, exist_ok=True)
+os.makedirs(NASDAQ_DIR, exist_ok=True)
+
+
 def get_query(params):
 
     query_list = [
@@ -23,29 +36,16 @@ def get_query(params):
 
 def main():
 
-    load_dotenv()
-
-    API_KEYS = os.environ['API_KEYS'].split(',')
-    API_KEY_IDX = 0
-
     print(API_KEYS)
     print(os.getcwd())
     print(os.listdir())
 
-    DATA_PATH = './data'
-    tickers_path = os.path.join(DATA_PATH, 'tickers')
+    tickers_dir = os.path.join(ALPHAVANTAGE_DIR, 'tickers')
 
-    os.makedirs(DATA_PATH, exist_ok=True)
+    os.makedirs(DATA_DIR, exist_ok=True)
 
-    with open(os.path.join(DATA_PATH, 'tickers_nasdaq.json'), 'r', encoding='utf-8') as file:
+    with open(os.path.join(NASDAQ_DIR, 'tickers_nasdaq.json'), 'r', encoding='utf-8') as file:
         tickers = json.load(file)['tickers']
-
-    # record_path = os.path.join(DATA_PATH, 'record.json')
-    # if os.path.exists(record_path):
-    #     with open(record_path, 'r', encoding='utf-8') as file:
-    #         record = json.load(file)
-    # else:
-    #     record = {ticker: [] for ticker in tickers}
 
     year_start = 2022
     year_end = 2024
@@ -67,8 +67,8 @@ def main():
 
     for ticker in tickers:
 
-        ticker_path = os.path.join(tickers_path, ticker)
-        os.makedirs(ticker_path, exist_ok=True)
+        ticker_dir = os.path.join(tickers_dir, ticker)
+        os.makedirs(ticker_dir, exist_ok=True)
 
         sleep(1)
         print()
@@ -78,7 +78,7 @@ def main():
             query_date_start_str = query_date_start.strftime('%Y%m%d')
             query_date_end_str = query_date_end.strftime('%Y%m%d')
             date_interval_str = f'{query_date_start_str}-{query_date_end_str}'
-            query_path = os.path.join(ticker_path, f'{date_interval_str}.json')
+            query_path = os.path.join(ticker_dir, f'{date_interval_str}.json')
 
             print(f'ticker: {ticker}')
             print(f'date_interval_str: {date_interval_str}')

@@ -10,15 +10,20 @@ import yfinance
 
 load_dotenv()
 
-DATA_PATH = './data'
+DATA_DIR = './data'
+KAGGLE_DIR = os.path.join(DATA_DIR, 'kaggle')
+YFINANCE_DIR = os.path.join(DATA_DIR, 'yfinance')
 
-source_news_path = os.path.join(DATA_PATH, 'analyst_ratings_processed.csv')
-news_path = os.path.join(DATA_PATH, 'data-news.csv')
-news_tickers_path = os.path.join(DATA_PATH, 'data-news-tickers.json')
+os.makedirs(KAGGLE_DIR, exist_ok=True)
+os.makedirs(YFINANCE_DIR, exist_ok=True)
 
-prices_yf_path = os.path.join(DATA_PATH, 'data-prices-yf.csv')
-info_yf_path = os.path.join(DATA_PATH, 'data-info-yf.json')
-prices_yf_tickers_path = os.path.join(DATA_PATH, 'data-prices-yf-tickers.json')
+source_news_path = os.path.join(KAGGLE_DIR, 'archive-news/analyst_ratings_processed.csv')
+news_path = os.path.join(KAGGLE_DIR, 'data-news.csv')
+news_tickers_path = os.path.join(KAGGLE_DIR, 'data-news-tickers.json')
+
+prices_yf_path = os.path.join(YFINANCE_DIR, 'data-prices-yf.csv')
+info_yf_path = os.path.join(YFINANCE_DIR, 'data-info-yf.json')
+prices_yf_tickers_path = os.path.join(YFINANCE_DIR, 'data-prices-yf-tickers.json')
 
 
 def get_data_prices():
@@ -69,8 +74,4 @@ def get_data_prices():
         json.dump(info, file, indent=2)
 
     return df_prices_yf, info_yf_path, df_prices_yf_tickers
-
-
-
-
 
