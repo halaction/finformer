@@ -1,0 +1,35 @@
+metrics:
+  dir: null
+  endpoint: key-metrics
+  path_params:
+    symbol: null
+  query_params:
+    apikey: null
+    limit: null
+    period: null
+news:
+  dir: null
+  endpoint: stock_news
+  path_params: null
+  query_params:
+    apikey: null
+    limit: null
+    page: null
+    tickers: null
+prices:
+  dir: null
+  endpoint: historical-price-full
+  path_params:
+    symbol: null
+  query_params:
+    apikey: null
+    from: null
+    serietype: null
+    to: null
+profile:
+  dir: null
+  endpoint: profile
+  path_params:
+    symbol: null
+  query_params:
+    apikey: null
