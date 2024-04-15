@@ -13,8 +13,6 @@ import yaml
 load_dotenv()
 API_KEY = os.environ['FMP_API_KEY']
 
-
-
 DATA_DIR = './data'
 SOURCE_DIR = './finformer/data'
 FMP_DIR = os.path.join(DATA_DIR, 'fmp')
@@ -31,24 +29,49 @@ for key in fmp_config.keys():
     os.makedirs(fmp_config[key]['dir'], exist_ok=True)
 
 
-def collect_dataset(key, tickers=None):
+class Dataset:
+    def __init__(
+        self,
+        tickers,
+        profile,
+        news,
+        prices,
+        metrics,
+    ):
+        self.tickers = tickers
+        self.profile = profile
+        self.news = news
+        self.prices = prices
+        self.metrics = metrics
 
-    dir = fmp_config[key]['dir']
 
-    if tickers is None:
+def collect_dataset(key):
+
+    config = fmp_config[key]
+
+    dir = config['dir']
+    separate = config['separate']
+
+    if separate:
+        df = None
+        ticker_filename_list = sorted(os.listdir(dir))
+        for ticker_filename in ticker_filename_list:
+            ticker_path = os.path.join(dir, ticker_filename)
+            if os.path.exists(ticker_path) and ticker_path.endswith('.csv'):
+                try:
+                    ticker_df = pd.read_csv(ticker_path)
+                except pd.errors.EmptyDataError:
+                    print(f'File {ticker_path} is empty!')
+                    continue
+                if df is None:
+                    df = ticker_df
+                else:
+                    df = pd.concat([df, ticker_df], axis=0)
+    else:
         path = os.path.join(dir, f'{key}.csv')
         df = pd.read_csv(path)
-    else:
-        df = None
-        for ticker in tickers:
-            path = os.path.join(dir, f'{ticker}.csv')
-            ticker_df = pd.read_csv(path)
-            if df is None:
-                df = ticker_df
-            else:
-                df = pd.concat([df, ticker_df], axis=0)
 
-    dataset_path = os.path.join(DATASET_DIR, key)
+    dataset_path = os.path.join(DATASET_DIR, f'{key}.csv')
     df.to_csv(dataset_path, index=False)
 
     return df
@@ -56,25 +79,31 @@ def collect_dataset(key, tickers=None):
 
 def get_dataset():
 
-    print(json.dumps(fmp_config, indent=2))
-
     # Tickers
-    tickers_path = os.path.join(FMP_DIR, 'tickers.json')
-    tickers = pd.read_json(tickers_path)['ticker'].tolist()
+    tickers_path = os.path.join(FMP_DIR, 'tickers.csv')
+    tickers_df = pd.read_csv(tickers_path)['symbol'].unique().tolist()
 
     # Profile
     profile_df = collect_dataset('profile')
 
     # News
-    news_df = collect_dataset('news', tickers)
+    news_df = collect_dataset('news')
 
     # Prices
-    prices_df = collect_dataset('prices', tickers)
+    prices_df = collect_dataset('prices')
 
     # Metrics
-    metrics_df = collect_dataset('metrics', tickers)
+    metrics_df = collect_dataset('metrics')
 
-    return profile_df, news_df, prices_df, metrics_df
+    dataset = Dataset(
+        tickers=tickers_df,
+        profile=profile_df,
+        news=news_df,
+        prices=prices_df,
+        metrics=metrics_df,
+    )
+
+    return dataset
 
 
 if __name__ == '__main__':

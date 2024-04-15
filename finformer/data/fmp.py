@@ -33,8 +33,6 @@ for key in fmp_config.keys():
     fmp_config[key]['dir'] = os.path.join(FMP_DIR, key)
     os.makedirs(fmp_config[key]['dir'], exist_ok=True)
 
-tickers_path = os.path.join(FMP_DIR, 'tickers.json')
-
 #logging.basicConfig(level=logging.INFO)
 #logger = logging.getLogger()
 
@@ -91,11 +89,14 @@ def get_query(path_params, query_params):
             if value is not None
         ]
 
-    query_list = [
-        f'{key}={value}'
-        for key, value in query_params.items()
-        if value is not None
-    ]
+    if query_params is None:
+        query_list = []
+    else:
+        query_list = [
+            f'{key}={value}'
+            for key, value in query_params.items()
+            if value is not None
+        ]
 
     if len(path_list) == 0:
         path_str = ''
@@ -110,6 +111,51 @@ def get_query(path_params, query_params):
     query = path_str + query_str
 
     return query
+
+
+
+def get_tickers():
+
+    index_names = ['sp500', 'nasdaq']
+
+    df_list = []
+
+    for index_name in index_names:
+        endpoint = f'{index_name}_constituent'
+
+        path_params = None
+        query_params = {
+            'apikey': API_KEY,
+        }
+
+        query = get_query(path_params, query_params)
+
+        url = get_url(endpoint, query)
+
+        status = Status.DEFAULT
+
+        try:
+            response = requests.get(url)
+            data = response.json()
+
+            status = Status.SUCCESS
+
+        except requests.exceptions.Timeout:
+            status = Status.FAILED
+            break
+
+        df_index = pd.DataFrame(data)
+        df_index['index_name'] = index_name
+
+        df_list.append(df_index)
+
+    if status is not Status.FAILED:
+        df = pd.concat(df_list, axis=0)
+
+        path = os.path.join(FMP_DIR, 'tickers.csv')
+        df.to_csv(path, index=False)
+
+    return status
 
 
 def check_tickers(key, tickers, force=False):
@@ -404,6 +450,8 @@ def get_prices(tickers, force=False, timeout=10):
                     key_list = data['historical']
                     key_df = pd.DataFrame(key_list)
 
+                    key_df['symbol'] = ticker
+
                     key_path = os.path.join(dir, f'{ticker}.csv')
                     key_df.to_csv(key_path, index=False)
 
@@ -430,6 +478,8 @@ def get_prices(tickers, force=False, timeout=10):
 
                         key_list = data['historical']
                         key_df = pd.DataFrame(key_list)
+
+                        key_df['symbol'] = ticker
 
                         key_path = os.path.join(dir, f'{ticker}.csv')
                         key_df.to_csv(key_path, index=False)
@@ -537,8 +587,14 @@ def get_metrics(tickers, force=False, timeout=10):
 
 def get_data(tickers=None, force=False, timeout=10):
 
+    tickers_path = os.path.join(FMP_DIR, 'tickers.json')
+
     if tickers is None:
-        tickers = pd.read_json(tickers_path)['ticker'].tolist()
+
+        if not os.path.exists(tickers_path):
+            get_tickers()
+
+        tickers = pd.read_csv(tickers_path)['symbol'].unique().tolist()
 
     get_profile(tickers, force=force, timeout=timeout)
     get_metrics(tickers, force=force, timeout=timeout)
