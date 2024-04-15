@@ -9,7 +9,6 @@ import pandas as pd
 import json
 import yaml
 import functools
-import logging
 
 
 load_dotenv()
@@ -36,8 +35,8 @@ for key in fmp_config.keys():
 
 tickers_path = os.path.join(FMP_DIR, 'tickers.json')
 
-logging.basicConfig(level=logging.INFO, format='%(message)s')
-logger = logging.getLogger()
+#logging.basicConfig(level=logging.INFO)
+#logger = logging.getLogger()
 
 
 def log(func):
@@ -50,7 +49,8 @@ def log(func):
         status = output.status
 
         report = get_report(endpoint, status)
-        logger.info(report)
+        #logger.info(report)
+        print(report)
 
         return output
 
@@ -196,32 +196,9 @@ def get_profile(tickers, force=False, timeout=10):
         retry_tickers = []
         failed_tickers = []
 
-        progress_bar = tqdm(enumerate(tickers), total=len(tickers))
-        for i, ticker in progress_bar:
-            progress_bar.set_description(desc=f'CALLING (endpoint={endpoint} | ticker={ticker})')
-
-            path_params['symbol'] = ticker
-
-            query = get_query(path_params, query_params)
-            url = get_url(endpoint, query)
-
-            try:
-                response = requests.get(url, timeout=timeout)
-                data = response.json()
-
-                key_list.extend(data)
-
-            except requests.exceptions.Timeout:
-                retry_tickers.append(ticker)
-
-            if (i + 1) % 100 == 0:
-                sleep(1)
-
-        if len(retry_tickers) > 0:
-
-            progress_bar = tqdm(enumerate(retry_tickers), total=len(retry_tickers))
+        with tqdm(enumerate(tickers), total=len(tickers)) as progress_bar:
             for i, ticker in progress_bar:
-                progress_bar.set_description(desc=f'RETRYING (endpoint={endpoint} | ticker={ticker})')
+                progress_bar.set_description(desc=f'CALLING (endpoint={endpoint} | ticker={ticker})')
 
                 path_params['symbol'] = ticker
 
@@ -235,10 +212,33 @@ def get_profile(tickers, force=False, timeout=10):
                     key_list.extend(data)
 
                 except requests.exceptions.Timeout:
-                    failed_tickers.append(ticker)
+                    retry_tickers.append(ticker)
 
                 if (i + 1) % 100 == 0:
                     sleep(1)
+
+        if len(retry_tickers) > 0:
+
+            with tqdm(enumerate(retry_tickers), total=len(retry_tickers)) as progress_bar:
+                for i, ticker in progress_bar:
+                    progress_bar.set_description(desc=f'RETRYING (endpoint={endpoint} | ticker={ticker})')
+
+                    path_params['symbol'] = ticker
+
+                    query = get_query(path_params, query_params)
+                    url = get_url(endpoint, query)
+
+                    try:
+                        response = requests.get(url, timeout=timeout)
+                        data = response.json()
+
+                        key_list.extend(data)
+
+                    except requests.exceptions.Timeout:
+                        failed_tickers.append(ticker)
+
+                    if (i + 1) % 100 == 0:
+                        sleep(1)
 
         key_df = pd.DataFrame(key_list)
         key_path = os.path.join(dir, f'{key}.csv')
@@ -276,47 +276,7 @@ def get_news(tickers, force=False, timeout=10):
         retry_tickers = []
         failed_tickers = []
 
-        progress_bar = tqdm(enumerate(tickers), total=len(tickers))
-        for i, ticker in progress_bar:
-
-            key_list = []
-
-            query_params['tickers'] = ticker
-            page = 0
-
-            while True:
-                progress_bar.set_description(desc=f'CALLING (endpoint={endpoint} | ticker={ticker} | page={page})')
-
-                query_params['page'] = page
-
-                query = get_query(path_params, query_params)
-                url = get_url(endpoint, query)
-
-                try:
-                    response = requests.get(url, timeout=timeout)
-                    data = response.json()
-
-                    if len(data) == 0:
-                        break
-                    else:
-                        key_list.extend(data)
-                        page += 1
-
-                except requests.exceptions.Timeout:
-                    retry_tickers.append(ticker)
-                    break
-
-            key_df = pd.DataFrame(key_list)
-
-            key_path = os.path.join(dir, f'{ticker}.csv')
-            key_df.to_csv(key_path, index=False)
-
-            if (i + 1) % 100 == 0:
-                sleep(1)
-
-        if len(retry_tickers) > 0:
-
-            progress_bar = tqdm(enumerate(retry_tickers), total=len(retry_tickers))
+        with tqdm(enumerate(tickers), total=len(tickers)) as progress_bar:
             for i, ticker in progress_bar:
 
                 key_list = []
@@ -325,7 +285,7 @@ def get_news(tickers, force=False, timeout=10):
                 page = 0
 
                 while True:
-                    progress_bar.set_description(desc=f'RETRYING (endpoint={endpoint} | ticker={ticker} | page={page})')
+                    progress_bar.set_description(desc=f'CALLING (endpoint={endpoint} | ticker={ticker} | page={page})')
 
                     query_params['page'] = page
 
@@ -343,7 +303,7 @@ def get_news(tickers, force=False, timeout=10):
                             page += 1
 
                     except requests.exceptions.Timeout:
-                        failed_tickers.append(ticker)
+                        retry_tickers.append(ticker)
                         break
 
                 key_df = pd.DataFrame(key_list)
@@ -353,6 +313,46 @@ def get_news(tickers, force=False, timeout=10):
 
                 if (i + 1) % 100 == 0:
                     sleep(1)
+
+        if len(retry_tickers) > 0:
+
+            with tqdm(enumerate(retry_tickers), total=len(retry_tickers)) as progress_bar:
+                for i, ticker in progress_bar:
+
+                    key_list = []
+
+                    query_params['tickers'] = ticker
+                    page = 0
+
+                    while True:
+                        progress_bar.set_description(desc=f'RETRYING (endpoint={endpoint} | ticker={ticker} | page={page})')
+
+                        query_params['page'] = page
+
+                        query = get_query(path_params, query_params)
+                        url = get_url(endpoint, query)
+
+                        try:
+                            response = requests.get(url, timeout=timeout)
+                            data = response.json()
+
+                            if len(data) == 0:
+                                break
+                            else:
+                                key_list.extend(data)
+                                page += 1
+
+                        except requests.exceptions.Timeout:
+                            failed_tickers.append(ticker)
+                            break
+
+                    key_df = pd.DataFrame(key_list)
+
+                    key_path = os.path.join(dir, f'{ticker}.csv')
+                    key_df.to_csv(key_path, index=False)
+
+                    if (i + 1) % 100 == 0:
+                        sleep(1)
 
         status = check_failed_tickers(failed_tickers)
 
@@ -388,36 +388,9 @@ def get_prices(tickers, force=False, timeout=10):
         retry_tickers = []
         failed_tickers = []
 
-        progress_bar = tqdm(enumerate(tickers), total=len(tickers))
-        for i, ticker in progress_bar:
-            progress_bar.set_description(desc=f'CALLING (endpoint={endpoint} | ticker={ticker})')
-
-            path_params['symbol'] = ticker
-
-            query = get_query(path_params, query_params)
-            url = get_url(endpoint, query)
-
-            try:
-                response = requests.get(url, timeout=timeout)
-                data = response.json()
-
-                key_list = data['historical']
-                key_df = pd.DataFrame(key_list)
-
-                key_path = os.path.join(dir, f'{ticker}.csv')
-                key_df.to_csv(key_path, index=False)
-
-            except requests.exceptions.Timeout:
-                retry_tickers.append(ticker)
-
-            if (i + 1) % 100 == 0:
-                sleep(1)
-
-        if len(retry_tickers) > 0:
-
-            progress_bar = tqdm(enumerate(retry_tickers), total=len(retry_tickers))
+        with tqdm(enumerate(tickers), total=len(tickers)) as progress_bar:
             for i, ticker in progress_bar:
-                progress_bar.set_description(desc=f'RETRYING (endpoint={endpoint} | ticker={ticker})')
+                progress_bar.set_description(desc=f'CALLING (endpoint={endpoint} | ticker={ticker})')
 
                 path_params['symbol'] = ticker
 
@@ -435,10 +408,37 @@ def get_prices(tickers, force=False, timeout=10):
                     key_df.to_csv(key_path, index=False)
 
                 except requests.exceptions.Timeout:
-                    failed_tickers.append(ticker)
+                    retry_tickers.append(ticker)
 
                 if (i + 1) % 100 == 0:
                     sleep(1)
+
+        if len(retry_tickers) > 0:
+
+            with tqdm(enumerate(retry_tickers), total=len(retry_tickers)) as progress_bar:
+                for i, ticker in progress_bar:
+                    progress_bar.set_description(desc=f'RETRYING (endpoint={endpoint} | ticker={ticker})')
+
+                    path_params['symbol'] = ticker
+
+                    query = get_query(path_params, query_params)
+                    url = get_url(endpoint, query)
+
+                    try:
+                        response = requests.get(url, timeout=timeout)
+                        data = response.json()
+
+                        key_list = data['historical']
+                        key_df = pd.DataFrame(key_list)
+
+                        key_path = os.path.join(dir, f'{ticker}.csv')
+                        key_df.to_csv(key_path, index=False)
+
+                    except requests.exceptions.Timeout:
+                        failed_tickers.append(ticker)
+
+                    if (i + 1) % 100 == 0:
+                        sleep(1)
 
         status = check_failed_tickers(failed_tickers)
 
@@ -473,36 +473,9 @@ def get_metrics(tickers, force=False, timeout=10):
         retry_tickers = []
         failed_tickers = []
 
-        progress_bar = tqdm(enumerate(tickers), total=len(tickers))
-        for i, ticker in progress_bar:
-            progress_bar.set_description(desc=f'CALLING (endpoint={endpoint} | ticker={ticker})')
-
-            path_params['symbol'] = ticker
-
-            query = get_query(path_params, query_params)
-            url = get_url(endpoint, query)
-
-            try:
-                response = requests.get(url, timeout=timeout)
-                data = response.json()
-
-                key_list = data
-                key_df = pd.DataFrame(key_list)
-
-                key_path = os.path.join(dir, f'{ticker}.csv')
-                key_df.to_csv(key_path, index=False)
-
-            except requests.exceptions.Timeout:
-                retry_tickers.append(ticker)
-
-            if (i + 1) % 100 == 0:
-                sleep(1)
-
-        if len(retry_tickers) > 0:
-
-            progress_bar = tqdm(enumerate(retry_tickers), total=len(retry_tickers))
+        with tqdm(enumerate(tickers), total=len(tickers)) as progress_bar:
             for i, ticker in progress_bar:
-                progress_bar.set_description(desc=f'RETRYING (endpoint={endpoint} | ticker={ticker})')
+                progress_bar.set_description(desc=f'CALLING (endpoint={endpoint} | ticker={ticker})')
 
                 path_params['symbol'] = ticker
 
@@ -520,10 +493,37 @@ def get_metrics(tickers, force=False, timeout=10):
                     key_df.to_csv(key_path, index=False)
 
                 except requests.exceptions.Timeout:
-                    failed_tickers.append(ticker)
+                    retry_tickers.append(ticker)
 
                 if (i + 1) % 100 == 0:
                     sleep(1)
+
+        if len(retry_tickers) > 0:
+
+            with tqdm(enumerate(retry_tickers), total=len(retry_tickers)) as progress_bar:
+                for i, ticker in progress_bar:
+                    progress_bar.set_description(desc=f'RETRYING (endpoint={endpoint} | ticker={ticker})')
+
+                    path_params['symbol'] = ticker
+
+                    query = get_query(path_params, query_params)
+                    url = get_url(endpoint, query)
+
+                    try:
+                        response = requests.get(url, timeout=timeout)
+                        data = response.json()
+
+                        key_list = data
+                        key_df = pd.DataFrame(key_list)
+
+                        key_path = os.path.join(dir, f'{ticker}.csv')
+                        key_df.to_csv(key_path, index=False)
+
+                    except requests.exceptions.Timeout:
+                        failed_tickers.append(ticker)
+
+                    if (i + 1) % 100 == 0:
+                        sleep(1)
 
         status = check_failed_tickers(failed_tickers)
 
