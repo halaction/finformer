@@ -1,5 +1,6 @@
 metrics:
   dir: null
+  separate: true
   endpoint: key-metrics
   path_params:
     symbol: null
@@ -9,6 +10,7 @@ metrics:
     period: null
 news:
   dir: null
+  separate: true
   endpoint: stock_news
   path_params: null
   query_params:
@@ -18,6 +20,7 @@ news:
     tickers: null
 prices:
   dir: null
+  separate: true
   endpoint: historical-price-full
   path_params:
     symbol: null
@@ -28,6 +31,7 @@ prices:
     to: null
 profile:
   dir: null
+  separate: false
   endpoint: profile
   path_params:
     symbol: null
