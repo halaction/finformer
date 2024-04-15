@@ -36,7 +36,7 @@ for key in fmp_config.keys():
 
 tickers_path = os.path.join(FMP_DIR, 'tickers.json')
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
 
@@ -50,6 +50,7 @@ def log(func):
         status = output.status
 
         report = get_report(endpoint, status)
+        print()
         logger.info(report)
 
         return output
@@ -211,7 +212,7 @@ def get_profile(tickers, force=False, timeout=10):
 
                 key_list.extend(data)
 
-            except:
+            except requests.exceptions.Timeout:
                 retry_tickers.append(ticker)
 
             if (i + 1) % 100 == 0:
@@ -234,7 +235,7 @@ def get_profile(tickers, force=False, timeout=10):
 
                     key_list.extend(data)
 
-                except:
+                except requests.exceptions.Timeout:
                     failed_tickers.append(ticker)
 
                 if (i + 1) % 100 == 0:
@@ -302,7 +303,7 @@ def get_news(tickers, force=False, timeout=10):
                         key_list.extend(data)
                         page += 1
 
-                except:
+                except requests.exceptions.Timeout:
                     retry_tickers.append(ticker)
                     break
 
@@ -342,7 +343,7 @@ def get_news(tickers, force=False, timeout=10):
                             key_list.extend(data)
                             page += 1
 
-                    except:
+                    except requests.exceptions.Timeout:
                         failed_tickers.append(ticker)
                         break
 
@@ -407,7 +408,7 @@ def get_prices(tickers, force=False, timeout=10):
                 key_path = os.path.join(dir, f'{ticker}.csv')
                 key_df.to_csv(key_path, index=False)
 
-            except:
+            except requests.exceptions.Timeout:
                 retry_tickers.append(ticker)
 
             if (i + 1) % 100 == 0:
@@ -434,7 +435,7 @@ def get_prices(tickers, force=False, timeout=10):
                     key_path = os.path.join(dir, f'{ticker}.csv')
                     key_df.to_csv(key_path, index=False)
 
-                except:
+                except requests.exceptions.Timeout:
                     failed_tickers.append(ticker)
 
                 if (i + 1) % 100 == 0:
@@ -492,7 +493,7 @@ def get_metrics(tickers, force=False, timeout=10):
                 key_path = os.path.join(dir, f'{ticker}.csv')
                 key_df.to_csv(key_path, index=False)
 
-            except:
+            except requests.exceptions.Timeout:
                 retry_tickers.append(ticker)
 
             if (i + 1) % 100 == 0:
@@ -519,7 +520,7 @@ def get_metrics(tickers, force=False, timeout=10):
                     key_path = os.path.join(dir, f'{ticker}.csv')
                     key_df.to_csv(key_path, index=False)
 
-                except:
+                except requests.exceptions.Timeout:
                     failed_tickers.append(ticker)
 
                 if (i + 1) % 100 == 0:
