@@ -51,6 +51,7 @@ fmp_config = {
     },
 }
 
+
 if __name__ == '__main__':
 
     with open('fmp-config.json', 'w', encoding='utf-8') as file:
