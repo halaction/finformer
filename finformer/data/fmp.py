@@ -46,8 +46,8 @@ def log(func):
 
         output = func(*args, **kwargs)
 
-        endpoint = output['endpoint']
-        status = output['status']
+        endpoint = output.endpoint
+        status = output.status
 
         report = get_report(endpoint, status)
         logger.info(report)
@@ -65,9 +65,9 @@ class Status(Enum):
 
 
 class Output:
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            setattr(self, key, value)
+    def __init__(self, endpoint=None, status=None):
+        self.endpoint = endpoint
+        self.status = status
 
 
 def get_report(endpoint, status):
