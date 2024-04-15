@@ -36,7 +36,7 @@ for key in fmp_config.keys():
 
 tickers_path = os.path.join(FMP_DIR, 'tickers.json')
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger()
 
 
@@ -50,7 +50,6 @@ def log(func):
         status = output.status
 
         report = get_report(endpoint, status)
-        print()
         logger.info(report)
 
         return output
