@@ -1,0 +1,10 @@
+metrics:
+  dir: null
+  separate: true
+  endpoint: key-metrics
+  path_params:
+    symbol: null
+  query_params:
+    apikey: null
+    limit: null
+    period: null

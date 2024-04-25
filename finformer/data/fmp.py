@@ -10,6 +10,8 @@ import json
 import yaml
 import functools
 
+from finformer.data.dataset import FinformerDataset
+
 
 load_dotenv()
 API_KEY = os.environ['FMP_API_KEY']
@@ -20,10 +22,12 @@ SOURCE_DIR = './finformer/data'
 FMP_DIR = os.path.join(DATA_DIR, 'fmp')
 SP500_DIR = os.path.join(DATA_DIR, 'sp500')
 NASDAQ_DIR = os.path.join(DATA_DIR, 'nasdaq')
+DATASET_DIR = os.path.join(DATA_DIR, 'dataset')
 
 os.makedirs(FMP_DIR, exist_ok=True)
 os.makedirs(SP500_DIR, exist_ok=True)
 os.makedirs(NASDAQ_DIR, exist_ok=True)
+os.makedirs(DATASET_DIR, exist_ok=True)
 
 fmp_config_path = os.path.join(SOURCE_DIR, 'fmp-config.yaml')
 with open(fmp_config_path, 'r', encoding='utf-8') as file:
@@ -32,9 +36,6 @@ with open(fmp_config_path, 'r', encoding='utf-8') as file:
 for key in fmp_config.keys():
     fmp_config[key]['dir'] = os.path.join(FMP_DIR, key)
     os.makedirs(fmp_config[key]['dir'], exist_ok=True)
-
-#logging.basicConfig(level=logging.INFO)
-#logger = logging.getLogger()
 
 
 def log(func):
@@ -47,7 +48,6 @@ def log(func):
         status = output.status
 
         report = get_report(endpoint, status)
-        #logger.info(report)
         print(report)
 
         return output
@@ -587,7 +587,7 @@ def get_metrics(tickers, force=False, timeout=10):
 
 def get_data(tickers=None, force=False, timeout=10):
 
-    tickers_path = os.path.join(FMP_DIR, 'tickers.json')
+    tickers_path = os.path.join(FMP_DIR, 'tickers.csv')
 
     if tickers is None:
 
@@ -600,6 +600,106 @@ def get_data(tickers=None, force=False, timeout=10):
     get_metrics(tickers, force=force, timeout=timeout)
     get_prices(tickers, force=force, timeout=timeout)
     get_news(tickers, force=force, timeout=timeout)
+
+
+def collect_dataset(key, force=False):
+
+    config = fmp_config[key]
+
+    dir = config['dir']
+    separate = config['separate']
+
+    dataset_path = os.path.join(DATASET_DIR, f'{key}.csv')
+    exists = os.path.exists(dataset_path)
+
+    if exists and not force:
+        print(f'Dataset {key} exists!')
+        df = pd.read_csv(dataset_path)
+    else:
+        if separate:
+            df = None
+            ticker_filename_list = sorted(os.listdir(dir))
+            with tqdm(ticker_filename_list) as progress_bar:
+                for ticker_filename in progress_bar:
+                    progress_bar.set_description(desc=f'COLLECTING (key={key} | filename={ticker_filename})')
+
+                    ticker_path = os.path.join(dir, ticker_filename)
+                    if os.path.exists(ticker_path) and ticker_path.endswith('.csv'):
+                        try:
+                            ticker_df = pd.read_csv(ticker_path)
+                        except pd.errors.EmptyDataError:
+                            print(f'File {ticker_path} is empty!')
+                            continue
+                        if df is None:
+                            df = ticker_df
+                        else:
+                            df = pd.concat([df, ticker_df], axis=0)
+        else:
+            path = os.path.join(dir, f'{key}.csv')
+            df = pd.read_csv(path)
+
+        df.to_csv(dataset_path, index=False)
+
+    return df
+
+
+def get_dataset(force=False):
+
+    # Tickers
+    tickers_path = os.path.join(FMP_DIR, 'tickers.csv')
+    tickers = pd.read_csv(tickers_path)['symbol'].unique().tolist()
+
+    # Profile
+    df = collect_dataset('profile', force=force)
+
+    df_profile = df
+
+    # News
+    df = collect_dataset('news', force=force)
+
+    columns = ['symbol', 'publishedDate', 'title', 'text']
+    df = df[columns]
+
+    df = df.rename(columns={
+        'symbol': 'ticker',
+        'publishedDate': 'timestamp',
+    })
+
+    df = df[df['ticker'].isin(tickers)]
+
+    df['date'] = df['timestamp'].str[:10]
+    df = df.drop(columns=['timestamp', ])
+
+    df_news = df
+
+    # Prices
+    df = collect_dataset('prices', force=force)
+
+    columns = ['symbol', 'date', 'open', 'high', 'low', 'close', 'volume']
+    df = df[columns]
+
+    df = df.rename(columns={
+        'symbol': 'ticker',
+    })
+
+    df = df[df['ticker'].isin(tickers)]
+
+    df_prices = df
+
+    # Metrics
+    df = collect_dataset('metrics', force=force)
+
+    df_metrics = df
+
+    dataset = FinformerDataset(
+        tickers=tickers,
+        profile=df_profile,
+        news=df_news,
+        prices=df_prices,
+        metrics=df_metrics,
+    )
+
+    return dataset
 
 
 if __name__ == '__main__':
