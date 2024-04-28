@@ -21,12 +21,12 @@ SOURCE_DATA_DIR = os.path.join(SOURCE_DIR, 'data')
 FMP_DIR = os.path.join(DATA_DIR, 'fmp')
 SP500_DIR = os.path.join(DATA_DIR, 'sp500')
 NASDAQ_DIR = os.path.join(DATA_DIR, 'nasdaq')
-DATASET_DIR = os.path.join(DATA_DIR, 'dataset')
+RAW_DATASET_DIR = os.path.join(DATA_DIR, 'raw-dataset')
 
 os.makedirs(FMP_DIR, exist_ok=True)
 os.makedirs(SP500_DIR, exist_ok=True)
 os.makedirs(NASDAQ_DIR, exist_ok=True)
-os.makedirs(DATASET_DIR, exist_ok=True)
+os.makedirs(RAW_DATASET_DIR, exist_ok=True)
 
 fmp_config_path = os.path.join(SOURCE_DATA_DIR, 'fmp-config.yaml')
 with open(fmp_config_path, 'r', encoding='utf-8') as file:
@@ -717,7 +717,7 @@ def collect_key(key, tickers, changes, force=False):
     dir = config['dir']
     separate = config['separate']
 
-    dataset_path = os.path.join(DATASET_DIR, f'{key}.csv')
+    dataset_path = os.path.join(RAW_DATASET_DIR, f'{key}.csv')
     exists = os.path.exists(dataset_path)
 
     if exists and not force:
@@ -780,13 +780,13 @@ def collect_data(force=False):
     condition = df_tickers['symbol'].isin(tickers_merged)
     df_tickers = df_tickers.loc[condition]
 
-    tickers_path = os.path.join(DATASET_DIR, 'tickers.csv')
+    tickers_path = os.path.join(RAW_DATASET_DIR, 'tickers.csv')
     df_tickers.to_csv(tickers_path, index=False)
 
     condition = df_changes['symbol'].isin(tickers_merged)
     df_changes = df_changes.loc[condition]
 
-    changes_path = os.path.join(DATASET_DIR, 'changes.csv')
+    changes_path = os.path.join(RAW_DATASET_DIR, 'changes.csv')
     df_changes.to_csv(changes_path, index=False)
 
-    return DATASET_DIR
+    return RAW_DATASET_DIR
