@@ -10,15 +10,14 @@ import json
 import yaml
 import functools
 
-from finformer.data.dataset import FinformerDataset
-
 
 load_dotenv()
 API_KEY = os.environ['FMP_API_KEY']
 
 DATA_DIR = './data'
-SOURCE_DIR = './finformer/data'
+SOURCE_DIR = './finformer'
 
+SOURCE_DATA_DIR = os.path.join(SOURCE_DIR, 'data')
 FMP_DIR = os.path.join(DATA_DIR, 'fmp')
 SP500_DIR = os.path.join(DATA_DIR, 'sp500')
 NASDAQ_DIR = os.path.join(DATA_DIR, 'nasdaq')
@@ -29,7 +28,7 @@ os.makedirs(SP500_DIR, exist_ok=True)
 os.makedirs(NASDAQ_DIR, exist_ok=True)
 os.makedirs(DATASET_DIR, exist_ok=True)
 
-fmp_config_path = os.path.join(SOURCE_DIR, 'fmp-config.yaml')
+fmp_config_path = os.path.join(SOURCE_DATA_DIR, 'fmp-config.yaml')
 with open(fmp_config_path, 'r', encoding='utf-8') as file:
     fmp_config = yaml.safe_load(file)
 
@@ -38,7 +37,12 @@ for key in fmp_config.keys():
     os.makedirs(fmp_config[key]['dir'], exist_ok=True)
 
 
-def log(func):
+config_path = os.path.join(SOURCE_DIR, 'config.yaml')
+with open(config_path, 'r', encoding='utf-8') as file:
+    config = yaml.safe_load(file)
+
+
+def status_logger(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
 
@@ -113,8 +117,7 @@ def get_query(path_params, query_params):
     return query
 
 
-
-def get_tickers():
+def load_tickers():
 
     index_names = ['sp500', 'nasdaq']
 
@@ -156,6 +159,93 @@ def get_tickers():
         df.to_csv(path, index=False)
 
     return status
+
+
+def load_changes():
+
+    endpoint = 'symbol_change'
+
+    path_params = None
+    query_params = {
+        'apikey': API_KEY,
+    }
+
+    query = get_query(path_params, query_params)
+    url = get_url(endpoint, query)
+
+    status = Status.DEFAULT
+
+    try:
+        response = requests.get(url)
+        data = response.json()
+
+        status = Status.SUCCESS
+
+        df = pd.DataFrame(data)
+
+        # In compliance with collect_key
+        df['symbol'] = df['newSymbol']
+
+    except requests.exceptions.Timeout:
+        status = Status.FAILED
+
+    if status is not Status.FAILED:
+        path = os.path.join(FMP_DIR, 'changes.csv')
+        df.to_csv(path, index=False)
+
+    return status
+
+
+def rename_indicator(row: pd.Series):
+
+    classes = (' A', ' B')
+    class_change = row['oldSymbol'].endswith(classes)
+    identifier_change = row['oldSymbol'].startswith(row['newSymbol'])
+
+    condition = not (class_change or identifier_change)
+    
+    return condition
+
+
+def parse_changes(df_tickers, df_changes, ):
+
+    start_date = pd.to_datetime(config.start_date, format='%Y-%m-%d').date()
+    end_date = pd.to_datetime(config.end_date, format='%Y-%m-%d').date()
+
+    columns = df_tickers.columns
+
+    df_tickers['_date_first_added'] = pd.to_datetime(df_tickers['dateFirstAdded'], format='%Y-%m-%d').dt.date
+    df_tickers['_delta_first_added'] = end_date - df_tickers['date_first_added']
+
+    condition = (
+        (df_tickers['_date_first_added'] <= end_date) 
+        & (df_tickers['_delta_first_added'].dt.days > 30)
+    )
+
+    df_tickers = df_tickers.loc[condition, columns]
+    
+    tickers = df_tickers['symbol'].unique().tolist()
+
+    columns = df_changes.columns
+
+    df_changes['_rename_indicator'] = df_changes.apply(rename_indicator, axis=1)
+    df_changes['_date'] = pd.to_datetime(df_changes['date'], format='%Y-%m-%d').dt.date
+
+    condition = (
+        (df_changes['_date'] >= start_date)  
+        & df_changes['newSymbol'].isin(tickers) 
+        & (~ df_changes['oldSymbol'].isin(tickers))
+        & df_changes['_rename_indicator']
+    )
+
+    df_changes = df_changes.loc[condition, columns]
+
+    tickers.extend(df_changes['oldSymbol'].unique().tolist())
+    tickers = list(set(tickers))
+
+    changes = dict(zip(df_changes['oldSymbol'], df_changes['newSymbol']))
+
+    return tickers, changes
 
 
 def check_tickers(key, tickers, force=False):
@@ -219,8 +309,8 @@ def check_failed_tickers(failed_tickers):
     return status
 
 
-@log
-def get_profile(tickers, force=False, timeout=10):
+@status_logger
+def load_profile(tickers, force=False, timeout=10):
 
     key = 'profile'
     key_list = []
@@ -287,6 +377,9 @@ def get_profile(tickers, force=False, timeout=10):
                         sleep(1)
 
         key_df = pd.DataFrame(key_list)
+
+        key_df.drop_duplicates(inplace=True)
+
         key_path = os.path.join(dir, f'{key}.csv')
         key_df.to_csv(key_path, index=False)
 
@@ -300,8 +393,8 @@ def get_profile(tickers, force=False, timeout=10):
     return output
 
 
-@log
-def get_news(tickers, force=False, timeout=10):
+@status_logger
+def load_news(tickers, force=False, timeout=10):
 
     key = 'news'
 
@@ -354,6 +447,8 @@ def get_news(tickers, force=False, timeout=10):
 
                 key_df = pd.DataFrame(key_list)
 
+                key_df.drop_duplicates(inplace=True)
+
                 key_path = os.path.join(dir, f'{ticker}.csv')
                 key_df.to_csv(key_path, index=False)
 
@@ -394,6 +489,8 @@ def get_news(tickers, force=False, timeout=10):
 
                     key_df = pd.DataFrame(key_list)
 
+                    key_df.drop_duplicates(inplace=True)
+
                     key_path = os.path.join(dir, f'{ticker}.csv')
                     key_df.to_csv(key_path, index=False)
 
@@ -410,8 +507,8 @@ def get_news(tickers, force=False, timeout=10):
     return output
 
 
-@log
-def get_prices(tickers, force=False, timeout=10):
+@status_logger
+def load_prices(tickers, force=False, timeout=10):
 
     key = 'prices'
 
@@ -450,6 +547,8 @@ def get_prices(tickers, force=False, timeout=10):
                     key_list = data['historical']
                     key_df = pd.DataFrame(key_list)
 
+                    key_df.drop_duplicates(inplace=True)
+
                     key_df['symbol'] = ticker
 
                     key_path = os.path.join(dir, f'{ticker}.csv')
@@ -479,6 +578,8 @@ def get_prices(tickers, force=False, timeout=10):
                         key_list = data['historical']
                         key_df = pd.DataFrame(key_list)
 
+                        key_df.drop_duplicates(inplace=True)
+
                         key_df['symbol'] = ticker
 
                         key_path = os.path.join(dir, f'{ticker}.csv')
@@ -500,8 +601,8 @@ def get_prices(tickers, force=False, timeout=10):
     return output
 
 
-@log
-def get_metrics(tickers, force=False, timeout=10):
+@status_logger
+def load_metrics(tickers, force=False, timeout=10):
 
     key = 'metrics'
 
@@ -539,6 +640,8 @@ def get_metrics(tickers, force=False, timeout=10):
                     key_list = data
                     key_df = pd.DataFrame(key_list)
 
+                    key_df.drop_duplicates(inplace=True)
+
                     key_path = os.path.join(dir, f'{ticker}.csv')
                     key_df.to_csv(key_path, index=False)
 
@@ -566,6 +669,8 @@ def get_metrics(tickers, force=False, timeout=10):
                         key_list = data
                         key_df = pd.DataFrame(key_list)
 
+                        key_df.drop_duplicates(inplace=True)
+
                         key_path = os.path.join(dir, f'{ticker}.csv')
                         key_df.to_csv(key_path, index=False)
 
@@ -585,24 +690,27 @@ def get_metrics(tickers, force=False, timeout=10):
     return output
 
 
-def get_data(tickers=None, force=False, timeout=10):
+def load_data(force=False, timeout=10):
+            
+    load_tickers()
 
     tickers_path = os.path.join(FMP_DIR, 'tickers.csv')
+    df_tickers = pd.read_csv(tickers_path)
 
-    if tickers is None:
+    load_changes()
 
-        if not os.path.exists(tickers_path):
-            get_tickers()
+    changes_path = os.path.join(FMP_DIR, 'changes.csv')
+    df_changes = pd.read_csv(changes_path)
 
-        tickers = pd.read_csv(tickers_path)['symbol'].unique().tolist()
+    tickers, changes = parse_changes(df_tickers, df_changes)
 
-    get_profile(tickers, force=force, timeout=timeout)
-    get_metrics(tickers, force=force, timeout=timeout)
-    get_prices(tickers, force=force, timeout=timeout)
-    get_news(tickers, force=force, timeout=timeout)
+    load_profile(tickers, force=force, timeout=timeout)
+    load_metrics(tickers, force=force, timeout=timeout)
+    load_prices(tickers, force=force, timeout=timeout)
+    load_news(tickers, force=force, timeout=timeout)
 
 
-def collect_dataset(key, force=False):
+def collect_key(key, tickers, changes, force=False):
 
     config = fmp_config[key]
 
@@ -630,6 +738,7 @@ def collect_dataset(key, force=False):
                         except pd.errors.EmptyDataError:
                             print(f'File {ticker_path} is empty!')
                             continue
+
                         if df is None:
                             df = ticker_df
                         else:
@@ -638,69 +747,46 @@ def collect_dataset(key, force=False):
             path = os.path.join(dir, f'{key}.csv')
             df = pd.read_csv(path)
 
+        # Merge ticker changes
+        df = df.replace({
+            'symbol': changes,
+        })
+
+        tickers_merged = list(set(tickers) - set(changes.keys()))
+        condition = df['symbol'].isin(tickers_merged)
+        df = df.loc[condition]
+
         df.to_csv(dataset_path, index=False)
 
-    return df
+    return dataset_path
 
 
-def get_dataset(force=False):
+def collect_data(force=False):
 
-    # Tickers
     tickers_path = os.path.join(FMP_DIR, 'tickers.csv')
-    tickers = pd.read_csv(tickers_path)['symbol'].unique().tolist()
+    df_tickers = pd.read_csv(tickers_path)
 
-    # Profile
-    df = collect_dataset('profile', force=force)
+    changes_path = os.path.join(FMP_DIR, 'changes.csv')
+    df_changes = pd.read_csv(changes_path)
 
-    df_profile = df
+    tickers, changes = parse_changes(df_tickers, df_changes)
 
-    # News
-    df = collect_dataset('news', force=force)
+    keys = ['profile', 'news', 'prices', 'metrics']
+    for key in keys:
+        collect_key(key, tickers, changes, force=force)
 
-    columns = ['symbol', 'publishedDate', 'title', 'text']
-    df = df[columns]
+    tickers_merged = list(set(tickers) - set(changes.keys()))
 
-    df = df.rename(columns={
-        'symbol': 'ticker',
-        'publishedDate': 'timestamp',
-    })
+    condition = df_tickers['symbol'].isin(tickers_merged)
+    df_tickers = df_tickers.loc[condition]
 
-    df = df[df['ticker'].isin(tickers)]
+    tickers_path = os.path.join(DATASET_DIR, 'tickers.csv')
+    df_tickers.to_csv(tickers_path, index=False)
 
-    df['date'] = df['timestamp'].str[:10]
-    df = df.drop(columns=['timestamp', ])
+    condition = df_changes['symbol'].isin(tickers_merged)
+    df_changes = df_changes.loc[condition]
 
-    df_news = df
+    changes_path = os.path.join(DATASET_DIR, 'changes.csv')
+    df_changes.to_csv(changes_path, index=False)
 
-    # Prices
-    df = collect_dataset('prices', force=force)
-
-    columns = ['symbol', 'date', 'open', 'high', 'low', 'close', 'volume']
-    df = df[columns]
-
-    df = df.rename(columns={
-        'symbol': 'ticker',
-    })
-
-    df = df[df['ticker'].isin(tickers)]
-
-    df_prices = df
-
-    # Metrics
-    df = collect_dataset('metrics', force=force)
-
-    df_metrics = df
-
-    dataset = FinformerDataset(
-        tickers=tickers,
-        profile=df_profile,
-        news=df_news,
-        prices=df_prices,
-        metrics=df_metrics,
-    )
-
-    return dataset
-
-
-if __name__ == '__main__':
-    get_data()
+    return DATASET_DIR

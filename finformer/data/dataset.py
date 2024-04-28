@@ -1,13 +1,7 @@
 import os
-import requests
-from dotenv import load_dotenv
 from tqdm import tqdm
-from time import sleep
-from enum import Enum
-
+from dotenv import load_dotenv
 import pandas as pd
-import json
-import yaml
 import re
 
 from huggingface_hub import login, hf_hub_download
@@ -23,10 +17,6 @@ login(token=HF_TOKEN)
 DATA_DIR = './data'
 SOURCE_DIR = './finformer/data'
 
-fmp_config_path = os.path.join(SOURCE_DIR, 'fmp-config.yaml')
-with open(fmp_config_path, 'r', encoding='utf-8') as file:
-    fmp_config = yaml.safe_load(file)
-
 
 def snake_case(string: str):
     pattern = re.compile(r'(?<!^)(?=[A-Z])')
@@ -34,95 +24,68 @@ def snake_case(string: str):
     return string
 
 
-def get_tickers():
-
-    repo_id = 'halaction/finformer-data'
-    filename = 'dataset/tickers.csv'
-
-    path = hf_hub_download(repo_id=repo_id, filename=filename, repo_type='dataset')
-    df = pd.read_csv(path)
-
-    tickers = df['symbol'].unique().tolist()
-
-    return tickers
-
-
-class SentimentDataset(Dataset):
-
-    def __init__(self, tickers):
-        self.tickers = tickers
-        self.keys = ['news']
-
-        repo_id = 'halaction/finformer-data'
-
-        for key in self.keys:
-            filename = f'dataset/{key}.csv'
-
-            path = hf_hub_download(repo_id=repo_id, filename=filename, repo_type='dataset')
-            df = pd.read_csv(path)
-
-            df = df[df['symbol'].isin(self.tickers)]
-
-            setattr(self, key, df)
-
-    def __len__(self):
-        pass
-
-    def __getitem__(self, index):
-        pass
-
-
-class TimeSeriesDataset(Dataset):
-
-    def __init__(self, tickers):
-
-        self.tickers = tickers
-        self.keys = ['prices', 'metrics', 'profile']
-
-        repo_id = 'halaction/finformer-data'
-
-        for key in self.keys:
-
-            filename = f'dataset/{key}.csv'
-
-            path = hf_hub_download(repo_id=repo_id, filename=filename, repo_type='dataset')
-            df = pd.read_csv(path)
-
-            df = df[df['symbol'].isin(self.tickers)]
-
-            setattr(self, key, df)
-
-    def __len__(self):
-        pass
-
-    def __getitem__(self, index):
-        pass
-
-
 class FinformerConfig:
+    repo_id = 'halaction/finformer-data'
     context_length = 30
     prediction_length = 15
     start_date = '2020-01-01'
     end_date = '2024-04-15'
 
 
-class FinformerDataset(Dataset):
+class FinformerData:
 
-    def __init__(self, config):
+    def __init__(self, config, force=False):
 
         self.config = config
 
-        self.tickers = self.get_tickers()
+        self.start_date = pd.to_datetime(self.config.start_date, format='%Y-%m-%d').date()
+        self.end_date = pd.to_datetime(self.config.end_date, format='%Y-%m-%d').date()
+        self.date_index = pd.date_range(start=self.start_date, end=self.end_date, freq='D')
 
-        # TODO: Encode all indices before sampling
+        self.keys = ['tickers', 'news', 'prices', 'profile', 'metrics', 'calendar']
 
-        self.df_news = self.get_news()
-        self.df_prices = self.get_prices()
-        self.df_profile = self.get_profile()
-        self.df_metrics = self.get_metrics()
+        os.makedirs('./data', exist_ok=True)
 
-        self.df_calendar = self.get_calendar()
-        self.df_report_calendar = self.get_report_calendar()
+        self.load(force=force)
+        self.save(force=force)
+
+    def load(self, force=False):
+
+        for key in tqdm(self.keys):
+
+            path = f'./data/{key}.pkl'
+            exists = os.path.exists(path)
+
+            if exists and not force:
+                df = pd.read_pickle(path)
+            else:
+                get_data = getattr(self, f'get_{key}')
+                df = get_data()
+
+            setattr(self, key, df)
+
+    def save(self, force=False):
+
+        for key in tqdm(self.keys):
+
+            path = f'./data/{key}.pkl'
+            exists = os.path.exists(path)
+
+            if not exists or force:
+                df = getattr(self, key)
+                df.to_pickle(f'./data/{key}.pkl')
+
+    def get_tickers(self):
+
+        repo_id = 'halaction/finformer-data'
+        filename = 'dataset/tickers.csv'
+
+        path = hf_hub_download(repo_id=repo_id, filename=filename, repo_type='dataset')
+        df = pd.read_csv(path)
+
+        tickers = pd.Series(df['symbol'].unique())
+
+        return tickers
 
     def get_news(self):
 
@@ -146,6 +109,9 @@ class FinformerDataset(Dataset):
 
         df['timestamp'] = pd.to_datetime(df['timestamp'], format='%Y-%m-%d %H:%M:%S')
         df['date'] = df['timestamp'].dt.date
+
+        condition_date = (df['date'] >= self.start_date) & (df['date'] <= self.end_date)
+        df = df.loc[condition_date, :]
 
         level = ['ticker', 'timestamp']
         df.set_index(level, inplace=True)
@@ -173,23 +139,22 @@ class FinformerDataset(Dataset):
             'date': 'timestamp',
         })
 
-        df['timestamp'] = pd.to_datetime(df['timestamp'], format='%Y-%m-%d %H:%M:%S')
+        df['timestamp'] = pd.to_datetime(df['timestamp'], format='%Y-%m-%d')
         df['date'] = df['timestamp'].dt.date
 
-        df = df.drop(columns=['timestamp', ])
+        condition_date = (df['date'] >= self.start_date) & (df['date'] <= self.end_date)
+        df = df.loc[condition_date, :]
 
-        start = pd.to_datetime(self.config.start_date, format='%Y-%m-%d')
-        end = pd.to_datetime(self.config.end_date, format='%Y-%m-%d')
-        date_index = pd.date_range(start=start, end=end, freq='D')
+        df = df.drop(columns=['timestamp', ])
 
         levels = ['ticker', 'date']
         df.set_index(levels, inplace=True)
         df.sort_index(level=levels, ascending=True, inplace=True)
 
-        df = df.loc[pd.IndexSlice[:, start:end], :]
+        df = df.loc[pd.IndexSlice[:, self.start_date:self.end_date], :]
 
         index = pd.MultiIndex.from_product(
-            [df.index.get_level_values('ticker').unique(), date_index],
+            [df.index.get_level_values('ticker').unique(), self.date_index],
             names=levels,
         )
 
@@ -222,7 +187,7 @@ class FinformerDataset(Dataset):
         df['date_ipo'] = pd.to_datetime(df['date_ipo'], format='%Y-%m-%d')
         df['_max_date_ipo'] = df['date_ipo'].max()
 
-        df['age_ipo'] = df['_max_date_ipo'] - df['date_ipo']
+        df['age_ipo'] = (df['_max_date_ipo'] - df['date_ipo']).dt.days
 
         df = df.drop(columns=['date_ipo', '_max_date_ipo'])
 
@@ -290,20 +255,20 @@ class FinformerDataset(Dataset):
             'symbol': 'ticker',
         })
 
-        df['report_period'] = df['calendar_year'].astype(str).str.cat(df['period'], sep='-')
-
-        df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d')
+        df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d').dt.date
         df['start_date'] = df['date']
 
-        levels = ['ticker', 'report_period']
+        levels = ['ticker', 'date']
         df.set_index(levels, inplace=True)
         df.sort_index(level=levels, ascending=True, inplace=True)
 
-        df['end_date'] = df.groupby(level=['ticker', ])['start_date'].shift(periods=-1, fill_value=self.config.end_date)
+        df['end_date'] = df.groupby(level=['ticker', ])['start_date'].shift(periods=-1, fill_value=self.end_date)
         df['end_date'] = df['end_date'] - pd.to_timedelta(1, unit='D')
 
+        condition_date = (df['end_date'] >= self.start_date) & (df['start_date'] <= self.end_date)
+        df = df.loc[condition_date, :]
+
         df = df.drop(columns=[
-            'date',
             'calendar_year',
             'period',
         ])
@@ -312,11 +277,7 @@ class FinformerDataset(Dataset):
 
     def get_calendar(self):
 
-        start = pd.to_datetime(self.config.start_date, format='%Y-%m-%d')
-        end = pd.to_datetime(self.config.end_date, format='%Y-%m-%d')
-        date_index = pd.date_range(start=start, end=end, freq='D')
-
-        df = pd.DataFrame(date_index, columns=['date'])
+        df = pd.DataFrame(self.date_index, columns=['date'])
 
         df['weekday'] = df['date'].dt.day_name()
         df['month'] = df['date'].dt.month_name()
@@ -330,49 +291,8 @@ class FinformerDataset(Dataset):
         columns = ['weekday', 'month', 'quarter']
         df = pd.get_dummies(df, columns=columns, drop_first=True)
 
-        return df
-
-    def get_report_calendar(self):
-
-        columns = ['start_date', 'end_date']
-        df = self.metrics[columns]
+        levels = ['date', ]
+        df.set_index(levels, inplace=True)
+        df.sort_index(level=levels, ascending=True, inplace=True)
 
         return df
-
-    def get_past_values(self, ticker_index, date_index):
-        columns = ['open', 'close']
-        df_past_values = self.df_prices.loc[pd.IndexSlice[ticker_index, date_index], columns]
-
-        shape = len(ticker_index), len(date_index), len(columns)
-        past_values = torch.tensor(df_past_values.values, dtype=torch.float64).view(shape)
-
-        return past_values
-
-    def get_past_observed_mask(self, past_values):
-        past_observed_mask = past_values.isnan()
-        return past_observed_mask
-
-    def get_static_categorical_features(self, ticker_index):
-        columns = ['sector_id', 'industry_id', 'country_id']
-        df_static_categorical_features = self.df_profile.loc[ticker_index, columns]
-
-        static_categorical_features = torch.tensor(df_static_categorical_features.values, dtype=torch.int64)
-
-        return static_categorical_features
-
-    def get_static_real_features(self, ticker_index, report_index):
-        index = zip(ticker_index, report_index)
-        df_static_real_features = self.df_metrics.loc[index, :]
-
-        # [B, ]
-        static_real_features = torch.tensor(df_static_real_features.values, dtype=torch.float64)
-
-        return static_real_features
-
-    def __len__(self):
-        pass
-
-    def __getitem__(self, index):
-        pass
-
-

@@ -1,0 +1,5 @@
+context_length: 30
+end_date: '2024-04-15'
+prediction_length: 15
+repo_id: halaction/finformer-data
+start_date: '2020-01-01'
