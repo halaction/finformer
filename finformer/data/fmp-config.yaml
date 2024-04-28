@@ -1,7 +1,7 @@
 metrics:
   dir: null
   separate: true
-  endpoint: key-metrics
+  endpoint: v3/key-metrics
   path_params:
     symbol: null
   query_params:
@@ -11,7 +11,7 @@ metrics:
 news:
   dir: null
   separate: true
-  endpoint: stock_news
+  endpoint: v3/stock_news
   path_params: null
   query_params:
     apikey: null
@@ -21,7 +21,7 @@ news:
 prices:
   dir: null
   separate: true
-  endpoint: historical-price-full
+  endpoint: v3/historical-price-full
   path_params:
     symbol: null
   query_params:
@@ -32,7 +32,7 @@ prices:
 profile:
   dir: null
   separate: false
-  endpoint: profile
+  endpoint: v3/profile
   path_params:
     symbol: null
   query_params:

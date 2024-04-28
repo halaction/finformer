@@ -36,7 +36,6 @@ for key in fmp_config.keys():
     fmp_config[key]['dir'] = os.path.join(FMP_DIR, key)
     os.makedirs(fmp_config[key]['dir'], exist_ok=True)
 
-
 config_path = os.path.join(SOURCE_DIR, 'config.yaml')
 with open(config_path, 'r', encoding='utf-8') as file:
     config = yaml.safe_load(file)
@@ -78,7 +77,7 @@ def get_report(endpoint, status):
 
 
 def get_url(endpoint, query):
-    url = f'https://financialmodelingprep.com/api/v3/{endpoint}{query}'
+    url = f'https://financialmodelingprep.com/api/{endpoint}{query}'
     return url
 
 
@@ -124,7 +123,7 @@ def load_tickers():
     df_list = []
 
     for index_name in index_names:
-        endpoint = f'{index_name}_constituent'
+        endpoint = f'v3/{index_name}_constituent'
 
         path_params = None
         query_params = {
@@ -132,7 +131,7 @@ def load_tickers():
         }
 
         query = get_query(path_params, query_params)
-
+        
         url = get_url(endpoint, query)
 
         status = Status.DEFAULT
@@ -163,7 +162,7 @@ def load_tickers():
 
 def load_changes():
 
-    endpoint = 'symbol_change'
+    endpoint = 'v4/symbol_change'
 
     path_params = None
     query_params = {
@@ -196,67 +195,15 @@ def load_changes():
     return status
 
 
-def rename_indicator(row: pd.Series):
-
-    classes = (' A', ' B')
-    class_change = row['oldSymbol'].endswith(classes)
-    identifier_change = row['oldSymbol'].startswith(row['newSymbol'])
-
-    condition = not (class_change or identifier_change)
-    
-    return condition
-
-
-def parse_changes(df_tickers, df_changes, ):
-
-    start_date = pd.to_datetime(config.start_date, format='%Y-%m-%d').date()
-    end_date = pd.to_datetime(config.end_date, format='%Y-%m-%d').date()
-
-    columns = df_tickers.columns
-
-    df_tickers['_date_first_added'] = pd.to_datetime(df_tickers['dateFirstAdded'], format='%Y-%m-%d').dt.date
-    df_tickers['_delta_first_added'] = end_date - df_tickers['date_first_added']
-
-    condition = (
-        (df_tickers['_date_first_added'] <= end_date) 
-        & (df_tickers['_delta_first_added'].dt.days > 30)
-    )
-
-    df_tickers = df_tickers.loc[condition, columns]
-    
-    tickers = df_tickers['symbol'].unique().tolist()
-
-    columns = df_changes.columns
-
-    df_changes['_rename_indicator'] = df_changes.apply(rename_indicator, axis=1)
-    df_changes['_date'] = pd.to_datetime(df_changes['date'], format='%Y-%m-%d').dt.date
-
-    condition = (
-        (df_changes['_date'] >= start_date)  
-        & df_changes['newSymbol'].isin(tickers) 
-        & (~ df_changes['oldSymbol'].isin(tickers))
-        & df_changes['_rename_indicator']
-    )
-
-    df_changes = df_changes.loc[condition, columns]
-
-    tickers.extend(df_changes['oldSymbol'].unique().tolist())
-    tickers = list(set(tickers))
-
-    changes = dict(zip(df_changes['oldSymbol'], df_changes['newSymbol']))
-
-    return tickers, changes
-
-
 def check_tickers(key, tickers, force=False):
 
     status = Status.DEFAULT
     difference = None
 
-    config = fmp_config[key]
+    key_config = fmp_config[key]
 
-    dir = config['dir']
-    separate = config['separate']
+    dir = key_config['dir']
+    separate = key_config['separate']
     path = os.path.join(dir, f'{key}.csv')
 
     if not force:
@@ -267,11 +214,10 @@ def check_tickers(key, tickers, force=False):
                 if _ticker.endswith('.csv'):
                     tickers_recorded.append(_ticker.split('.')[0])
             difference = list(set(tickers) - set(tickers_recorded))
-
         else:
             if os.path.exists(path):
                 data_df = pd.read_csv(path)
-                tickers_recorded = data_df['symbol'].tolist()
+                tickers_recorded = data_df['symbol'].unique().tolist()
                 difference = list(set(tickers) - set(tickers_recorded))
 
         if difference is not None:
@@ -283,7 +229,7 @@ def check_tickers(key, tickers, force=False):
     return status, tickers
 
 
-def check_failed_tickers(failed_tickers):
+def check_failed_tickers(key, failed_tickers):
 
     if len(failed_tickers) > 0:
         status = Status.FAILED
@@ -291,7 +237,7 @@ def check_failed_tickers(failed_tickers):
         log_path = os.path.join(FMP_DIR, 'log.json')
 
         if os.path.exists(log_path):
-            with open(log_path, 'w', encoding='utf-8') as file:
+            with open(log_path, 'r', encoding='utf-8') as file:
                 log = json.load(file)
         else:
             log = dict()
@@ -315,14 +261,14 @@ def load_profile(tickers, force=False, timeout=10):
     key = 'profile'
     key_list = []
 
-    config = fmp_config[key]
+    key_config = fmp_config[key]
 
-    dir = config['dir']
-    endpoint = config['endpoint']
+    dir = key_config['dir']
+    endpoint = key_config['endpoint']
 
-    path_params = config['path_params']
+    path_params = key_config['path_params']
 
-    query_params = config['query_params']
+    query_params = key_config['query_params']
     query_params['apikey'] = API_KEY
 
     status, tickers = check_tickers(key, tickers, force=force)
@@ -383,7 +329,7 @@ def load_profile(tickers, force=False, timeout=10):
         key_path = os.path.join(dir, f'{key}.csv')
         key_df.to_csv(key_path, index=False)
 
-        status = check_failed_tickers(failed_tickers)
+        status = check_failed_tickers(key, failed_tickers)
 
     output = Output(
         endpoint=endpoint,
@@ -398,14 +344,14 @@ def load_news(tickers, force=False, timeout=10):
 
     key = 'news'
 
-    config = fmp_config[key]
+    key_config = fmp_config[key]
 
-    dir = config['dir']
-    endpoint = config['endpoint']
+    dir = key_config['dir']
+    endpoint = key_config['endpoint']
 
-    path_params = config['path_params']
+    path_params = key_config['path_params']
 
-    query_params = config['query_params']
+    query_params = key_config['query_params']
     query_params['apikey'] = API_KEY
 
     status, tickers = check_tickers(key, tickers, force=force)
@@ -430,7 +376,7 @@ def load_news(tickers, force=False, timeout=10):
 
                     query = get_query(path_params, query_params)
                     url = get_url(endpoint, query)
-
+                    
                     try:
                         response = requests.get(url, timeout=timeout)
                         data = response.json()
@@ -444,6 +390,9 @@ def load_news(tickers, force=False, timeout=10):
                     except requests.exceptions.Timeout:
                         retry_tickers.append(ticker)
                         break
+
+                    if (page + 1) % 50 == 0:
+                        sleep(1)
 
                 key_df = pd.DataFrame(key_list)
 
@@ -497,7 +446,7 @@ def load_news(tickers, force=False, timeout=10):
                     if (i + 1) % 100 == 0:
                         sleep(1)
 
-        status = check_failed_tickers(failed_tickers)
+        status = check_failed_tickers(key, failed_tickers)
 
     output = Output(
         endpoint=endpoint,
@@ -512,14 +461,14 @@ def load_prices(tickers, force=False, timeout=10):
 
     key = 'prices'
 
-    config = fmp_config[key]
+    key_config = fmp_config[key]
 
-    dir = config['dir']
-    endpoint = config['endpoint']
+    dir = key_config['dir']
+    endpoint = key_config['endpoint']
 
-    path_params = config['path_params']
+    path_params = key_config['path_params']
 
-    query_params = config['query_params']
+    query_params = key_config['query_params']
     query_params['from'] = '2010-01-01'
     query_params['to'] = '2024-05-01'
     query_params['apikey'] = API_KEY
@@ -591,7 +540,7 @@ def load_prices(tickers, force=False, timeout=10):
                     if (i + 1) % 100 == 0:
                         sleep(1)
 
-        status = check_failed_tickers(failed_tickers)
+        status = check_failed_tickers(key, failed_tickers)
 
     output = Output(
         endpoint=endpoint,
@@ -606,14 +555,14 @@ def load_metrics(tickers, force=False, timeout=10):
 
     key = 'metrics'
 
-    config = fmp_config[key]
+    key_config = fmp_config[key]
 
-    dir = config['dir']
-    endpoint = config['endpoint']
+    dir = key_config['dir']
+    endpoint = key_config['endpoint']
 
-    path_params = config['path_params']
+    path_params = key_config['path_params']
 
-    query_params = config['query_params']
+    query_params = key_config['query_params']
     query_params['period'] = 'quarter'
     query_params['apikey'] = API_KEY
 
@@ -680,7 +629,7 @@ def load_metrics(tickers, force=False, timeout=10):
                     if (i + 1) % 100 == 0:
                         sleep(1)
 
-        status = check_failed_tickers(failed_tickers)
+        status = check_failed_tickers(key, failed_tickers)
 
     output = Output(
         endpoint=endpoint,
@@ -690,14 +639,70 @@ def load_metrics(tickers, force=False, timeout=10):
     return output
 
 
+def rename_indicator(row: pd.Series):
+
+    classes = (' A', ' B')
+    class_change = row['oldSymbol'].endswith(classes)
+    identifier_change = row['oldSymbol'].startswith(row['newSymbol'])
+
+    condition = not (class_change or identifier_change)
+    
+    return condition
+
+
+def parse_changes(df_tickers, df_changes):
+
+    start_date = pd.to_datetime(config['start_date'], format='%Y-%m-%d').date()
+    end_date = pd.to_datetime(config['end_date'], format='%Y-%m-%d').date()
+
+    df_tickers.drop_duplicates(inplace=True)
+
+    columns = df_tickers.columns
+
+    df_tickers['_date_first_added'] = df_tickers['dateFirstAdded'].str.strip().combine_first(df_tickers['founded'])
+    df_tickers['_date_first_added'] = pd.to_datetime(df_tickers['_date_first_added'], format='%Y-%m-%d').dt.date
+    df_tickers['_delta_first_added'] = end_date - df_tickers['_date_first_added']
+
+    condition = (
+        (df_tickers['_date_first_added'] <= end_date) 
+        & (df_tickers['_delta_first_added'].dt.days > 30)
+    )
+
+    df_tickers = df_tickers.loc[condition, columns]
+    
+    tickers = df_tickers['symbol'].unique().tolist()
+
+    columns = df_changes.columns
+
+    df_changes['_rename_indicator'] = df_changes.apply(rename_indicator, axis=1)
+    df_changes['_date'] = pd.to_datetime(df_changes['date'], format='%Y-%m-%d').dt.date
+
+    condition = (
+        (df_changes['_date'] >= start_date)  
+        & df_changes['newSymbol'].isin(tickers) 
+        & (~ df_changes['oldSymbol'].isin(tickers))
+        & df_changes['_rename_indicator']
+    )
+
+    df_changes = df_changes.loc[condition, columns]
+
+    tickers.extend(df_changes['oldSymbol'].unique().tolist())
+    tickers = list(set(tickers))
+
+    changes = dict(zip(df_changes['oldSymbol'], df_changes['newSymbol']))
+
+    return tickers, changes
+
+
 def load_data(force=False, timeout=10):
-            
+
     load_tickers()
+    load_changes()
+
+    # TODO: Return paths instead of status
 
     tickers_path = os.path.join(FMP_DIR, 'tickers.csv')
     df_tickers = pd.read_csv(tickers_path)
-
-    load_changes()
 
     changes_path = os.path.join(FMP_DIR, 'changes.csv')
     df_changes = pd.read_csv(changes_path)
@@ -709,6 +714,8 @@ def load_data(force=False, timeout=10):
     load_prices(tickers, force=force, timeout=timeout)
     load_news(tickers, force=force, timeout=timeout)
 
+    return FMP_DIR
+
 
 def collect_key(key, tickers, changes, force=False):
 
@@ -719,6 +726,8 @@ def collect_key(key, tickers, changes, force=False):
 
     dataset_path = os.path.join(RAW_DATASET_DIR, f'{key}.csv')
     exists = os.path.exists(dataset_path)
+
+    tickers_merged = list(set(tickers) - set(changes.keys()))
 
     if exists and not force:
         print(f'Dataset {key} exists!')
@@ -743,18 +752,20 @@ def collect_key(key, tickers, changes, force=False):
                             df = ticker_df
                         else:
                             df = pd.concat([df, ticker_df], axis=0)
+
+            # Merge ticker changes
+            df = df.replace({
+                'symbol': changes,
+            })
+            
         else:
             path = os.path.join(dir, f'{key}.csv')
             df = pd.read_csv(path)
-
-        # Merge ticker changes
-        df = df.replace({
-            'symbol': changes,
-        })
-
-        tickers_merged = list(set(tickers) - set(changes.keys()))
+        
         condition = df['symbol'].isin(tickers_merged)
         df = df.loc[condition]
+
+        df.drop_duplicates(inplace=True)
 
         df.to_csv(dataset_path, index=False)
 
