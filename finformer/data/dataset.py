@@ -152,7 +152,7 @@ class FinformerData:
         df.set_index(level, inplace=True)
         df.sort_index(level=level, ascending=True, inplace=True)
 
-        df[['title', 'text']] = df.fillna('')
+        df[['title', 'text']] = df[['title', 'text']].fillna('')
 
         return df
 
