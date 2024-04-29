@@ -344,7 +344,9 @@ class FinformerDataset(Dataset):
         batch_end = self.start_date + delta
 
         self.batch_date_index = pd.date_range(start=self.start_date, end=batch_end, freq='D')
-        self.start_date_int = self.batch_date_index.values.astype(int).min()
+
+        self.timestamp_freq = int(24 * 60 * 60 * 1e9)
+        self.start_date_int = self.batch_date_index.values.astype(int).min() // self.timestamp_freq
 
         self._index = self._get_index()
 
@@ -410,7 +412,7 @@ class FinformerDataset(Dataset):
             )
 
             _date_index = df_text.index.get_level_values('timestamp').floor(freq='D').values.astype(int)
-            _date_index -= self.start_date_int
+            _date_index = _date_index // self.timestamp_freq - self.start_date_int
             _date_index = torch.tensor(_date_index, dtype=torch.int64).unsqueeze(0)
 
             batch_encoding['date_index'] = _date_index
