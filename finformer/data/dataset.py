@@ -406,10 +406,11 @@ class FinformerDataset(Dataset):
                 truncation=True,
                 max_length=self.config.sentiment_model.max_length,
                 return_tensors='pt',
-                return_length=True,
             )
 
             _date_index = df_text.index.get_level_values('timestamp').floor(freq='D')
+            _date_index = torch.tensor(_date_index.values.astype(int), dtype=torch.int64).unsqueeze(0)
+
             batch_encoding['date_index'] = _date_index
 
         return batch_encoding
