@@ -360,7 +360,7 @@ class FinformerDataset(Dataset):
 
         batch_text, batch_num = self.get_batch(ticker_index, date_index)
 
-        return batch_text, batch_num
+        return ticker, date_offset, batch_text, batch_num
     
     def _get_tokenizer(self):
         tokenizer = AutoTokenizer.from_pretrained(self.config.sentiment_model.pretrained_model_name)
