@@ -379,14 +379,42 @@ class FinformerDataset(Dataset):
 
     def get_batch(self, ticker_index, date_index):
 
-        batch_encoding, text_date, length = self.get_text(ticker_index, date_index)
+        batch_text = self.get_text(ticker_index, date_index)
+        batch_num = self.get_num(ticker_index, date_index)
 
-        batch_text = dict(
-            ticker_index=ticker_index,
-            length=length,
-            batch_encoding=batch_encoding,
-            text_date=text_date,
-        )
+        return batch_text, batch_num
+
+    def get_text(self, ticker_index, date_index):
+
+        batch_start = date_index.min().date()
+        batch_end = date_index.max().date()
+        columns = ['title', 'text']
+        df_text = self.data.news.loc[pd.IndexSlice[ticker_index, batch_start:batch_end], columns]
+
+        text = df_text['title'].tolist()
+        text_pair = df_text['text'].tolist()
+
+        if len(text) == 0:
+            batch_encoding = None
+        else:
+
+            batch_encoding = self.tokenizer(
+                text=text,
+                text_pair=text_pair,
+                add_special_tokens=True,
+                padding=True,
+                truncation=True,
+                max_length=self.config.sentiment_model.max_length,
+                return_tensors='pt',
+                return_length=True,
+            )
+
+            _date_index = df_text.index.get_level_values('timestamp').floor(freq='D')
+            batch_encoding['date_index'] = _date_index
+
+        return batch_encoding
+    
+    def get_num(self, ticker_index, date_index):
 
         # TODO: Separate batches in dataloader / collate / training to utilize GPU
         batch_values = self.get_batch_values(ticker_index, date_index)
@@ -401,7 +429,6 @@ class FinformerDataset(Dataset):
         static_real_features = self.get_static_real_features(ticker_index)
 
         batch_num = dict(
-            ticker_index=ticker_index,
             past_values=past_values,
             past_time_features=past_time_features,
             future_values=future_values,
@@ -410,36 +437,7 @@ class FinformerDataset(Dataset):
             static_real_features=static_real_features,
         )
 
-        return batch_text, batch_num
-
-    def get_text(self, ticker_index, date_index):
-
-        batch_start = date_index.min().date()
-        batch_end = date_index.max().date()
-        columns = ['title', 'text']
-        df_text = self.data.news.loc[pd.IndexSlice[ticker_index, batch_start:batch_end], columns]
-
-        text = df_text['title'].tolist()
-        text_pair = df_text['text'].tolist()
-
-        length = len(text)
-
-        if length == 0:
-            batch_encoding = None
-        else:
-            batch_encoding = self.tokenizer(
-                text=text,
-                text_pair=text_pair,
-                add_special_tokens=True,
-                padding=True,
-                truncation=True,
-                max_length=self.config.sentiment_model.max_length,
-                return_tensors='pt',
-            )
-
-        text_date = df_text.index.get_level_values('timestamp').floor(freq='D')
-
-        return batch_encoding, text_date, length
+        return batch_num
 
     def get_batch_values(self, ticker_index, date_index):
 
