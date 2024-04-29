@@ -11,13 +11,14 @@ params:
   end_date: '2024-04-15'
   prediction_length: 15
   start_date: '2020-01-01'
+sentiment_model:
+  pretrained_model_name: ProsusAI/finbert
+  max_length: 512
+time_series_model: 
+  name: null
 hf:
   dataset_dir: raw-dataset
   repo_id: halaction/finformer-data
-  sentiment_model: 
-    name: ProsusAI/finbert
-  time_series_model: 
-    name: null
 fmp:
   metrics:
     dir: ./data/fmp/metrics

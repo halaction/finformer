@@ -8,16 +8,12 @@ import re
 from itertools import product
 
 from huggingface_hub import login, hf_hub_download
-from torch.utils.data import Dataset, DataLoader
+from transformers import AutoTokenizer
+from torch.utils.data import Dataset
 from sklearn.preprocessing import LabelEncoder
 
 from finformer.utils import FinformerConfig, snake_case
 
-
-load_dotenv()
-HF_TOKEN = os.environ['HF_TOKEN']
-
-login(token=HF_TOKEN)
 
 config = FinformerConfig()
 
@@ -32,7 +28,7 @@ def collate_fn(batch):
 
 class FinformerData:
 
-    def __init__(self, config, force=False):
+    def __init__(self, config, hf_token=None, force=False):
 
         self.config = config
 
@@ -43,6 +39,12 @@ class FinformerData:
         self.keys = ['tickers', 'changes', 'profile', 'metrics', 'prices', 'news', 'calendar']
 
         os.makedirs(self.config.dirs.dataset_dir, exist_ok=True)
+
+        if hf_token is None:
+            load_dotenv()
+            hf_token = os.environ['HF_TOKEN']
+
+        login(token=hf_token)
 
         self.load(force=force)
         self.save(force=force)
@@ -343,11 +345,12 @@ class FinformerDataset(Dataset):
 
         self._index = self._get_index()
 
+        self.tokenizer = self._get_tokenizer()
+
     def __len__(self):
         return len(self._index)
 
     def __getitem__(self, idx):
-
         ticker, date_offset = self._index[idx]
 
         ticker_index = ticker
@@ -356,6 +359,10 @@ class FinformerDataset(Dataset):
         batch_text, batch_num = self.get_batch(ticker_index, date_index)
 
         return batch_text, batch_num
+    
+    def _get_tokenizer(self):
+        tokenizer = AutoTokenizer.from_pretrained(self.config.sentiment_model.pretrained_model_name)
+        return tokenizer
 
     def _get_index(self):
 
@@ -370,7 +377,14 @@ class FinformerDataset(Dataset):
 
     def get_batch(self, ticker_index, date_index):
 
-        text, text_pair, text_date, length = self.get_text(ticker_index, date_index)
+        batch_encoding, text_date, length = self.get_text(ticker_index, date_index)
+
+        batch_text = dict(
+            ticker_index=ticker_index,
+            length=length,
+            batch_encoding=batch_encoding,
+            text_date=text_date,
+        )
 
         # TODO: Separate batches in dataloader / collate / training to utilize GPU
         batch_values = self.get_batch_values(ticker_index, date_index)
@@ -383,14 +397,6 @@ class FinformerDataset(Dataset):
 
         static_categorical_features = self.get_static_categorical_features(ticker_index)
         static_real_features = self.get_static_real_features(ticker_index)
-
-        batch_text = dict(
-            ticker_index=ticker_index,
-            length=length,
-            text=text,
-            text_pair=text_pair,
-            text_date=text_date,
-        )
 
         batch_num = dict(
             ticker_index=ticker_index,
@@ -413,11 +419,22 @@ class FinformerDataset(Dataset):
 
         text = df_text['title'].tolist()
         text_pair = df_text['text'].tolist()
+
+        batch_encoding = self.tokenizer(
+            text=text,
+            text_pair=text_pair,
+            add_special_tokens=True,
+            padding=True,
+            truncation=True,
+            max_length=self.config.sentiment_model.max_length,
+            return_tensors='pt',
+        )
+
         text_date = df_text.index.get_level_values('timestamp').floor(freq='D')
 
         length = len(text)
 
-        return text, text_pair, text_date, length
+        return batch_encoding, text_date, length
 
     def get_batch_values(self, ticker_index, date_index):
 
