@@ -7,55 +7,27 @@ from enum import Enum
 
 import pandas as pd
 import json
-import yaml
-import functools
+
+from finformer.utils import FinformerConfig, adaptive_get
 
 
 load_dotenv()
 API_KEY = os.environ['FMP_API_KEY']
 
-DATA_DIR = './data'
-SOURCE_DIR = './finformer'
+config = FinformerConfig()
+fmp_config = config.fmp
 
-SOURCE_DATA_DIR = os.path.join(SOURCE_DIR, 'data')
-FMP_DIR = os.path.join(DATA_DIR, 'fmp')
-SP500_DIR = os.path.join(DATA_DIR, 'sp500')
-NASDAQ_DIR = os.path.join(DATA_DIR, 'nasdaq')
-RAW_DATASET_DIR = os.path.join(DATA_DIR, 'raw-dataset')
+DATA_DIR = config.dirs.data_dir
+SOURCE_DIR = config.dirs.source_dir
+SOURCE_DATA_DIR = config.dirs.source_data_dir
+FMP_DIR = config.dirs.fmp_dir
+RAW_DATASET_DIR = config.dirs.raw_dataset_dir
 
 os.makedirs(FMP_DIR, exist_ok=True)
-os.makedirs(SP500_DIR, exist_ok=True)
-os.makedirs(NASDAQ_DIR, exist_ok=True)
 os.makedirs(RAW_DATASET_DIR, exist_ok=True)
 
-fmp_config_path = os.path.join(SOURCE_DATA_DIR, 'fmp-config.yaml')
-with open(fmp_config_path, 'r', encoding='utf-8') as file:
-    fmp_config = yaml.safe_load(file)
-
 for key in fmp_config.keys():
-    fmp_config[key]['dir'] = os.path.join(FMP_DIR, key)
     os.makedirs(fmp_config[key]['dir'], exist_ok=True)
-
-config_path = os.path.join(SOURCE_DIR, 'config.yaml')
-with open(config_path, 'r', encoding='utf-8') as file:
-    config = yaml.safe_load(file)
-
-
-def status_logger(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-
-        output = func(*args, **kwargs)
-
-        endpoint = output.endpoint
-        status = output.status
-
-        report = get_report(endpoint, status)
-        print(report)
-
-        return output
-
-    return wrapper
 
 
 class Status(Enum):
@@ -63,12 +35,6 @@ class Status(Enum):
     SUCCESS = 1
     EXISTS = 2
     FAILED = 3
-
-
-class Output:
-    def __init__(self, endpoint=None, status=None):
-        self.endpoint = endpoint
-        self.status = status
 
 
 def get_report(endpoint, status):
@@ -118,8 +84,11 @@ def get_query(path_params, query_params):
 
 def load_tickers():
 
-    index_names = ['sp500', 'nasdaq']
+    key = 'tickers'
+    path = os.path.join(FMP_DIR, f'{key}.csv')
 
+    index_names = ['sp500', 'nasdaq']
+    
     df_list = []
 
     for index_name in index_names:
@@ -151,16 +120,21 @@ def load_tickers():
 
         df_list.append(df_index)
 
+        report = get_report(endpoint, status)
+        print(report)
+
     if status is not Status.FAILED:
         df = pd.concat(df_list, axis=0)
-
-        path = os.path.join(FMP_DIR, 'tickers.csv')
+        df.drop_duplicates(subset='symbol', inplace=True)
         df.to_csv(path, index=False)
 
-    return status
+    return path
 
 
 def load_changes():
+
+    key = 'changes'
+    path = os.path.join(FMP_DIR, f'{key}.csv')
 
     endpoint = 'v4/symbol_change'
 
@@ -189,10 +163,12 @@ def load_changes():
         status = Status.FAILED
 
     if status is not Status.FAILED:
-        path = os.path.join(FMP_DIR, 'changes.csv')
         df.to_csv(path, index=False)
 
-    return status
+    report = get_report(endpoint, status)
+    print(report)
+
+    return path
 
 
 def check_tickers(key, tickers, force=False):
@@ -255,10 +231,10 @@ def check_failed_tickers(key, failed_tickers):
     return status
 
 
-@status_logger
 def load_profile(tickers, force=False, timeout=10):
 
     key = 'profile'
+
     key_list = []
 
     key_config = fmp_config[key]
@@ -291,6 +267,9 @@ def load_profile(tickers, force=False, timeout=10):
                     response = requests.get(url, timeout=timeout)
                     data = response.json()
 
+                    if len(data) == 0:
+                        data = [{'symbol': ticker}, ]
+
                     key_list.extend(data)
 
                 except requests.exceptions.Timeout:
@@ -314,6 +293,9 @@ def load_profile(tickers, force=False, timeout=10):
                         response = requests.get(url, timeout=timeout)
                         data = response.json()
 
+                        if len(data) == 0:
+                            data = [{'symbol': ticker}, ]
+
                         key_list.extend(data)
 
                     except requests.exceptions.Timeout:
@@ -322,24 +304,35 @@ def load_profile(tickers, force=False, timeout=10):
                     if (i + 1) % 100 == 0:
                         sleep(1)
 
+        print(key_list)
+
         key_df = pd.DataFrame(key_list)
+
+        print(key_df)
+
+        print(len(key_df))
+
+        key_path = os.path.join(dir, f'{key}.csv')
+        if os.path.exists(key_path):
+            recorded_key_df = pd.read_csv(key_path)
+            key_df = pd.concat([key_df, recorded_key_df], axis=0, ignore_index=True)
+
+        print(len(key_df))
 
         key_df.drop_duplicates(inplace=True)
 
-        key_path = os.path.join(dir, f'{key}.csv')
+        print(len(key_df))
+
         key_df.to_csv(key_path, index=False)
 
         status = check_failed_tickers(key, failed_tickers)
 
-    output = Output(
-        endpoint=endpoint,
-        status=status,
-    )
+    report = get_report(endpoint, status)
+    print(report)
 
-    return output
+    return dir
 
 
-@status_logger
 def load_news(tickers, force=False, timeout=10):
 
     key = 'news'
@@ -378,7 +371,7 @@ def load_news(tickers, force=False, timeout=10):
                     url = get_url(endpoint, query)
                     
                     try:
-                        response = requests.get(url, timeout=timeout)
+                        response = adaptive_get(url)
                         data = response.json()
 
                         if len(data) == 0:
@@ -392,7 +385,7 @@ def load_news(tickers, force=False, timeout=10):
                         break
 
                     if (page + 1) % 50 == 0:
-                        sleep(1)
+                        sleep(5)
 
                 key_df = pd.DataFrame(key_list)
 
@@ -448,15 +441,12 @@ def load_news(tickers, force=False, timeout=10):
 
         status = check_failed_tickers(key, failed_tickers)
 
-    output = Output(
-        endpoint=endpoint,
-        status=status,
-    )
+    report = get_report(endpoint, status)
+    print(report)
 
-    return output
+    return dir
 
 
-@status_logger
 def load_prices(tickers, force=False, timeout=10):
 
     key = 'prices'
@@ -542,15 +532,12 @@ def load_prices(tickers, force=False, timeout=10):
 
         status = check_failed_tickers(key, failed_tickers)
 
-    output = Output(
-        endpoint=endpoint,
-        status=status,
-    )
+    report = get_report(endpoint, status)
+    print(report)
 
-    return output
+    return dir
 
 
-@status_logger
 def load_metrics(tickers, force=False, timeout=10):
 
     key = 'metrics'
@@ -631,12 +618,10 @@ def load_metrics(tickers, force=False, timeout=10):
 
         status = check_failed_tickers(key, failed_tickers)
 
-    output = Output(
-        endpoint=endpoint,
-        status=status,
-    )
+    report = get_report(endpoint, status)
+    print(report)
 
-    return output
+    return dir
 
 
 def rename_indicator(row: pd.Series):
@@ -650,12 +635,10 @@ def rename_indicator(row: pd.Series):
     return condition
 
 
-def parse_changes(df_tickers, df_changes):
+def parse_changes(df_tickers, df_changes, return_df=False):
 
-    start_date = pd.to_datetime(config['start_date'], format='%Y-%m-%d').date()
-    end_date = pd.to_datetime(config['end_date'], format='%Y-%m-%d').date()
-
-    df_tickers.drop_duplicates(inplace=True)
+    start_date = pd.to_datetime(config.params.start_date, format='%Y-%m-%d').date()
+    end_date = pd.to_datetime(config.params.end_date, format='%Y-%m-%d').date()
 
     columns = df_tickers.columns
 
@@ -669,7 +652,7 @@ def parse_changes(df_tickers, df_changes):
     )
 
     df_tickers = df_tickers.loc[condition, columns]
-    
+
     tickers = df_tickers['symbol'].unique().tolist()
 
     columns = df_changes.columns
@@ -691,23 +674,33 @@ def parse_changes(df_tickers, df_changes):
 
     changes = dict(zip(df_changes['oldSymbol'], df_changes['newSymbol']))
 
-    return tickers, changes
+    output = tickers, changes
+
+    if return_df:
+        tickers_merged = list(set(tickers) - set(changes.keys()))
+
+        condition = df_tickers['symbol'].isin(tickers_merged)
+        df_tickers = df_tickers.loc[condition, :]
+
+        condition = df_changes['symbol'].isin(tickers_merged)
+        df_changes = df_changes.loc[condition, :]
+
+        output += df_tickers, df_changes
+
+    return output
 
 
 def load_data(force=False, timeout=10):
 
-    load_tickers()
-    load_changes()
+    tickers_path = load_tickers()
+    changes_path = load_changes()
 
     # TODO: Return paths instead of status
 
-    tickers_path = os.path.join(FMP_DIR, 'tickers.csv')
     df_tickers = pd.read_csv(tickers_path)
-
-    changes_path = os.path.join(FMP_DIR, 'changes.csv')
     df_changes = pd.read_csv(changes_path)
 
-    tickers, changes = parse_changes(df_tickers, df_changes)
+    tickers, changes = parse_changes(df_tickers, df_changes, return_df=False)
 
     load_profile(tickers, force=force, timeout=timeout)
     load_metrics(tickers, force=force, timeout=timeout)
@@ -719,10 +712,10 @@ def load_data(force=False, timeout=10):
 
 def collect_key(key, tickers, changes, force=False):
 
-    config = fmp_config[key]
+    key_config = fmp_config[key]
 
-    dir = config['dir']
-    separate = config['separate']
+    dir = key_config['dir']
+    separate = key_config['separate']
 
     dataset_path = os.path.join(RAW_DATASET_DIR, f'{key}.csv')
     exists = os.path.exists(dataset_path)
@@ -780,24 +773,16 @@ def collect_data(force=False):
     changes_path = os.path.join(FMP_DIR, 'changes.csv')
     df_changes = pd.read_csv(changes_path)
 
-    tickers, changes = parse_changes(df_tickers, df_changes)
-
-    keys = ['profile', 'news', 'prices', 'metrics']
-    for key in keys:
-        collect_key(key, tickers, changes, force=force)
-
-    tickers_merged = list(set(tickers) - set(changes.keys()))
-
-    condition = df_tickers['symbol'].isin(tickers_merged)
-    df_tickers = df_tickers.loc[condition]
+    tickers, changes, df_tickers, df_changes = parse_changes(df_tickers, df_changes, return_df=True)
 
     tickers_path = os.path.join(RAW_DATASET_DIR, 'tickers.csv')
     df_tickers.to_csv(tickers_path, index=False)
 
-    condition = df_changes['symbol'].isin(tickers_merged)
-    df_changes = df_changes.loc[condition]
-
     changes_path = os.path.join(RAW_DATASET_DIR, 'changes.csv')
     df_changes.to_csv(changes_path, index=False)
+
+    keys = ['profile', 'metrics', 'prices', 'news']
+    for key in keys:
+        collect_key(key, tickers, changes, force=force)
 
     return RAW_DATASET_DIR

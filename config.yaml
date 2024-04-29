@@ -1,0 +1,61 @@
+dirs:
+  data_dir: ./data
+  source_dir: ./finformer
+  source_data_dir: ./finformer/data
+  source_model_dir: ./finformer/model
+  fmp_dir: ./data/fmp
+  raw_dataset_dir: ./data/raw-dataset
+  dataset_dir: ./data/dataset
+params:
+  context_length: 30
+  end_date: '2024-04-15'
+  prediction_length: 15
+  start_date: '2020-01-01'
+hf:
+  dataset_dir: raw-dataset
+  repo_id: halaction/finformer-data
+  sentiment_model: 
+    name: ProsusAI/finbert
+  time_series_model: 
+    name: null
+fmp:
+  metrics:
+    dir: ./data/fmp/metrics
+    separate: true
+    endpoint: v3/key-metrics
+    path_params:
+      symbol: null
+    query_params:
+      apikey: null
+      limit: null
+      period: null
+  news:
+    dir: ./data/fmp/news
+    separate: true
+    endpoint: v3/stock_news
+    path_params: null
+    query_params:
+      apikey: null
+      limit: null
+      page: null
+      tickers: null
+  prices:
+    dir: ./data/fmp/prices
+    separate: true
+    endpoint: v3/historical-price-full
+    path_params:
+      symbol: null
+    query_params:
+      apikey: null
+      from: null
+      serietype: null
+      to: null
+  profile:
+    dir: ./data/fmp/profile
+    separate: false
+    endpoint: v3/profile
+    path_params:
+      symbol: null
+    query_params:
+      apikey: null
+

@@ -21,10 +21,13 @@ login(token=HF_TOKEN)
 
 config = FinformerConfig()
 
-DATA_DIR = './data'
-SOURCE_DIR = './finformer'
+DATA_DIR = config.dirs.data_dir
+SOURCE_DIR = config.dirs.source_dir
 
-RAW_DATASET_DIR = os.path.join(DATA_DIR, 'raw-dataset')
+
+def collate_fn(batch):
+    
+    return batch
 
 
 class FinformerData:
@@ -33,62 +36,97 @@ class FinformerData:
 
         self.config = config
 
-        self.start_date = pd.to_datetime(self.config.start_date, format='%Y-%m-%d').date()
-        self.end_date = pd.to_datetime(self.config.end_date, format='%Y-%m-%d').date()
+        self.start_date = pd.to_datetime(self.config.params.start_date, format='%Y-%m-%d').date()
+        self.end_date = pd.to_datetime(self.config.params.end_date, format='%Y-%m-%d').date()
         self.date_index = pd.date_range(start=self.start_date, end=self.end_date, freq='D')
 
-        self.keys = ['tickers', 'news', 'prices', 'profile', 'metrics', 'calendar']
+        self.keys = ['tickers', 'changes', 'profile', 'metrics', 'prices', 'news', 'calendar']
 
-        os.makedirs('./data', exist_ok=True)
+        os.makedirs(self.config.dirs.dataset_dir, exist_ok=True)
 
         self.load(force=force)
         self.save(force=force)
 
     def load(self, force=False):
 
-        for key in tqdm(self.keys):
+        progress_bar = tqdm(self.keys)
+        for key in progress_bar:
+            progress_bar.set_description(desc=f'LOADING (key={key})')
 
-            path = f'./data/{key}.pkl'
+            path = os.path.join(self.config.dirs.dataset_dir, f'{key}.pkl')
             exists = os.path.exists(path)
 
             if exists and not force:
                 df = pd.read_pickle(path)
             else:
-                get_data = getattr(self, f'get_{key}')
-                df = get_data()
+                df = self._get_data(key)
 
             setattr(self, key, df)
 
     def save(self, force=False):
 
-        for key in tqdm(self.keys):
+        progress_bar = tqdm(self.keys)
+        for key in progress_bar:
+            progress_bar.set_description(desc=f'SAVING (key={key})')
 
-            path = f'./data/{key}.pkl'
+            path = os.path.join(self.config.dirs.dataset_dir, f'{key}.pkl')
             exists = os.path.exists(path)
 
             if not exists or force:
                 df = getattr(self, key)
-                df.to_pickle(f'./data/{key}.pkl')
+                df.to_pickle(path)
+
+    def _load_csv(self, key):
+
+        filename = os.path.join(self.config.hf.dataset_dir, f'{key}.csv')
+        path = hf_hub_download(repo_id=self.config.hf.repo_id, filename=filename, repo_type='dataset')
+        df = pd.read_csv(path)
+
+        return df
+    
+    def _get_data(self, key):
+
+        if key == 'tickers':
+            df = self.get_tickers()
+        elif key == 'changes':
+            df = self.get_changes()
+        elif key == 'profile':
+            df = self.get_profile()
+        elif key == 'metrics':
+            df = self.get_metrics()
+        elif key == 'prices':
+            df = self.get_prices()
+        elif key == 'news':
+            df = self.get_news()
+        elif key == 'calendar':
+            df = self.get_calendar()
+        else:
+            raise ValueError(f'Unknown key `{key}` is provided.')
+
+        return df
 
     def get_tickers(self):
 
-        repo_id = 'halaction/finformer-data'
-        filename = 'dataset/tickers.csv'
-
-        path = hf_hub_download(repo_id=repo_id, filename=filename, repo_type='dataset')
-        df = pd.read_csv(path)
+        key = 'tickers'
+        df = self._load_csv(key)
 
         tickers = pd.Series(df['symbol'].unique())
 
         return tickers
+    
+    def get_changes(self):
+        
+        key = 'changes'
+        df = self._load_csv(key)
+
+        changes = df.loc[:, ['oldSymbol', 'newSymbol']]
+
+        return changes
 
     def get_news(self):
 
         key = 'news'
-
-        filename = f'dataset/{key}.csv'
-        path = hf_hub_download(repo_id=self.config.repo_id, filename=filename, repo_type='dataset')
-        df = pd.read_csv(path)
+        df = self._load_csv(key)
 
         df.drop_duplicates(inplace=True)
 
@@ -117,12 +155,9 @@ class FinformerData:
     def get_prices(self):
 
         key = 'prices'
+        df = self._load_csv(key)
 
-        filename = f'dataset/{key}.csv'
-        path = hf_hub_download(repo_id=self.config.repo_id, filename=filename, repo_type='dataset')
-        df = pd.read_csv(path)
-
-        df.drop_duplicates(inplace=True)
+        df.drop_duplicates(subset=['symbol', 'date'], inplace=True)
 
         condition = df['symbol'].isin(self.tickers)
         columns = ['symbol', 'date', 'open', 'high', 'low', 'close', 'volume']
@@ -160,10 +195,7 @@ class FinformerData:
     def get_profile(self):
 
         key = 'profile'
-
-        filename = f'dataset/{key}.csv'
-        path = hf_hub_download(repo_id=self.config.repo_id, filename=filename, repo_type='dataset')
-        df = pd.read_csv(path)
+        df = self._load_csv(key)
 
         df.drop_duplicates(inplace=True)
 
@@ -191,11 +223,13 @@ class FinformerData:
         df.loc[df['ticker'] == 'SOLV', 'industry'] = 'Medical - Healthcare Information Services'
         df.loc[df['country'].isna(), 'country'] = 'US'
 
+        df['symbol'] = df['ticker']
+
         levels = ['ticker', ]
         df.set_index(levels, inplace=True)
         df.sort_index(level=levels, ascending=True, inplace=True)
 
-        columns = ['sector', 'industry', 'country']
+        columns = ['symbol', 'sector', 'industry', 'country']
         label_encoders = {column: LabelEncoder() for column in columns}
 
         for column, encoder in label_encoders.items():
@@ -208,10 +242,7 @@ class FinformerData:
     def get_metrics(self):
 
         key = 'metrics'
-
-        filename = f'dataset/{key}.csv'
-        path = hf_hub_download(repo_id=self.config.repo_id, filename=filename, repo_type='dataset')
-        df = pd.read_csv(path)
+        df = self._load_csv(key)
 
         df.drop_duplicates(inplace=True)
 
@@ -257,7 +288,7 @@ class FinformerData:
         df.set_index(levels, inplace=True)
         df.sort_index(level=levels, ascending=True, inplace=True)
 
-        df['end_date'] = df.groupby(level=['ticker', ])['start_date'].shift(periods=-1, fill_value=self.end_date)
+        df['end_date'] = df.groupby(level='ticker')['start_date'].shift(periods=-1, fill_value=self.end_date)
         df['end_date'] = df['end_date'] - pd.to_timedelta(1, unit='D')
 
         condition_date = (df['end_date'] >= self.start_date) & (df['start_date'] <= self.end_date)
@@ -280,7 +311,7 @@ class FinformerData:
         df['is_month_end'] = df['date'].dt.is_month_end
         df['quarter'] = df['date'].dt.quarter
         df['is_quarter_end'] = df['date'].dt.is_quarter_end
-        start_year = pd.to_datetime(self.config.start_date, format='%Y-%m-%d').year
+        start_year = pd.to_datetime(self.config.params.start_date, format='%Y-%m-%d').year
         df['age'] = df['date'].dt.year - start_year
 
         columns = ['weekday', 'month', 'quarter']
@@ -300,23 +331,24 @@ class FinformerDataset(Dataset):
         self.data = data
         self.config = config
 
-        self.start_date = pd.to_datetime(self.config.start_date, format='%Y-%m-%d').date()
-        self.end_date = pd.to_datetime(self.config.end_date, format='%Y-%m-%d').date()
+        self.start_date = pd.to_datetime(self.config.params.start_date, format='%Y-%m-%d').date()
+        self.end_date = pd.to_datetime(self.config.params.end_date, format='%Y-%m-%d').date()
 
-        self.batch_length = self.config.context_length + self.config.prediction_length
+        self.batch_length = self.config.params.context_length + self.config.params.prediction_length
 
         delta = pd.to_timedelta(self.batch_length - 1, unit='D')
         batch_end = self.start_date + delta
 
         self.batch_date_index = pd.date_range(start=self.start_date, end=batch_end, freq='D')
 
-        self.index_map = self.get_index_map()
+        self._index = self._get_index()
 
     def __len__(self):
-        return len(self.index_map)
+        return len(self._index)
 
     def __getitem__(self, idx):
-        ticker, date_offset = self.index_map[idx]
+
+        ticker, date_offset = self._index[idx]
 
         ticker_index = ticker
         date_index = self.batch_date_index + pd.to_timedelta(date_offset, unit='D')
@@ -325,44 +357,43 @@ class FinformerDataset(Dataset):
 
         return batch_text, batch_num
 
-    def get_index_map(self):
+    def _get_index(self):
 
         ticker_index = self.data.tickers
 
         n_dates = (self.end_date - self.start_date).days + 1
         date_offset_index = list(range(0, n_dates, self.batch_length))
 
-        index_map = dict()
+        _index = list(product(ticker_index, date_offset_index))
 
-        index = product(ticker_index, date_offset_index)
-        for i, (ticker, date_offset) in enumerate(index):
-            index_map[i] = (ticker, date_offset)
-
-        return index_map
+        return _index
 
     def get_batch(self, ticker_index, date_index):
 
-        text, text_pair, text_date = self.get_text(ticker_index, date_index)
+        text, text_pair, text_date, length = self.get_text(ticker_index, date_index)
 
         # TODO: Separate batches in dataloader / collate / training to utilize GPU
         batch_values = self.get_batch_values(ticker_index, date_index)
-        past_values = batch_values[:, :self.config.context_length, :]
-        future_values = batch_values[:, self.config.context_length:, :]
+        past_values = batch_values[:, :self.config.params.context_length, :]
+        future_values = batch_values[:, self.config.params.context_length:, :]
 
         batch_time_features = self.get_batch_time_features(ticker_index, date_index)
-        past_time_features = batch_time_features[:, :self.config.context_length, :]
-        future_time_features = batch_time_features[:, self.config.context_length:, :]
+        past_time_features = batch_time_features[:, :self.config.params.context_length, :]
+        future_time_features = batch_time_features[:, self.config.params.context_length:, :]
 
         static_categorical_features = self.get_static_categorical_features(ticker_index)
         static_real_features = self.get_static_real_features(ticker_index)
 
         batch_text = dict(
+            ticker_index=ticker_index,
+            length=length,
             text=text,
             text_pair=text_pair,
             text_date=text_date,
         )
 
         batch_num = dict(
+            ticker_index=ticker_index,
             past_values=past_values,
             past_time_features=past_time_features,
             future_values=future_values,
@@ -384,7 +415,9 @@ class FinformerDataset(Dataset):
         text_pair = df_text['text'].tolist()
         text_date = df_text.index.get_level_values('timestamp').floor(freq='D')
 
-        return text, text_pair, text_date
+        length = len(text)
+
+        return text, text_pair, text_date, length
 
     def get_batch_values(self, ticker_index, date_index):
 
@@ -468,7 +501,7 @@ class FinformerDataset(Dataset):
 
     def get_static_categorical_features(self, ticker_index):
 
-        columns = ['sector_id', 'industry_id', 'country_id']
+        columns = ['symbol_id', 'sector_id', 'industry_id', 'country_id']
         df_static_categorical_features = self.data.profile.loc[ticker_index, columns]
 
         # [B, N]
@@ -485,4 +518,4 @@ class FinformerDataset(Dataset):
         static_real_features = torch.tensor(df_static_real_features.values.astype('float'), dtype=torch.float64).unsqueeze(0)
 
         return static_real_features
-
+    
