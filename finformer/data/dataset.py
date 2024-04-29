@@ -1,5 +1,5 @@
 import os
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from dotenv import load_dotenv
 import pandas as pd
 import torch
@@ -420,19 +420,22 @@ class FinformerDataset(Dataset):
         text = df_text['title'].tolist()
         text_pair = df_text['text'].tolist()
 
-        batch_encoding = self.tokenizer(
-            text=text,
-            text_pair=text_pair,
-            add_special_tokens=True,
-            padding=True,
-            truncation=True,
-            max_length=self.config.sentiment_model.max_length,
-            return_tensors='pt',
-        )
+        length = len(text)
+
+        if length == 0:
+            batch_encoding = None
+        else:
+            batch_encoding = self.tokenizer(
+                text=text,
+                text_pair=text_pair,
+                add_special_tokens=True,
+                padding=True,
+                truncation=True,
+                max_length=self.config.sentiment_model.max_length,
+                return_tensors='pt',
+            )
 
         text_date = df_text.index.get_level_values('timestamp').floor(freq='D')
-
-        length = len(text)
 
         return batch_encoding, text_date, length
 

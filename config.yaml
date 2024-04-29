@@ -13,7 +13,7 @@ params:
   start_date: '2020-01-01'
 sentiment_model:
   pretrained_model_name: ProsusAI/finbert
-  max_length: 512
+  max_length: 256
 time_series_model: 
   name: null
 hf:

@@ -1,7 +1,7 @@
 import os
 import requests
 from dotenv import load_dotenv
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from time import sleep
 from enum import Enum
 
