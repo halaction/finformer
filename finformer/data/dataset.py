@@ -430,8 +430,8 @@ class FinformerDataset(Dataset):
 
         # TODO: Separate batches in dataloader / collate / training to utilize GPU
         batch_values = self.get_batch_values(ticker_index, date_index)
-        past_values = batch_values[:, :self.config.params.context_length, :]
-        future_values = batch_values[:, self.config.params.context_length:, :]
+        past_values = batch_values[:self.config.params.context_length, :]
+        future_values = batch_values[self.config.params.context_length:, :]
 
         batch_time_features = self.get_batch_time_features(ticker_index, date_index)
         past_time_features = batch_time_features[:self.config.params.context_length, :]
