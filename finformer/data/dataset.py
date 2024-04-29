@@ -361,9 +361,9 @@ class FinformerDataset(Dataset):
         ticker_index = ticker
         date_index = self.batch_date_index + pd.to_timedelta(date_offset, unit='D')
 
-        batch_text, batch_num = self.get_batch(ticker_index, date_index)
+        length, batch_text, batch_num = self.get_batch(ticker_index, date_index)
 
-        return ticker, date_offset, batch_text, batch_num
+        return ticker, date_offset, length, batch_text, batch_num, 
     
     def _get_tokenizer(self):
         tokenizer = AutoTokenizer.from_pretrained(self.config.sentiment_model.pretrained_model_name)
@@ -382,10 +382,10 @@ class FinformerDataset(Dataset):
 
     def get_batch(self, ticker_index, date_index):
 
-        batch_text = self.get_text(ticker_index, date_index)
+        length, batch_text = self.get_text(ticker_index, date_index)
         batch_num = self.get_num(ticker_index, date_index)
 
-        return batch_text, batch_num
+        return length, batch_text, batch_num
 
     def get_text(self, ticker_index, date_index):
 
@@ -397,10 +397,11 @@ class FinformerDataset(Dataset):
         text = df_text['title'].tolist()
         text_pair = df_text['text'].tolist()
 
-        if len(text) == 0:
+        length = len(text)
+
+        if length == 0:
             batch_encoding = None
         else:
-
             batch_encoding = self.tokenizer(
                 text=text,
                 text_pair=text_pair,
@@ -416,8 +417,8 @@ class FinformerDataset(Dataset):
             _date_index = torch.tensor(_date_index, dtype=torch.int64).unsqueeze(0)
 
             batch_encoding['date_index'] = _date_index
-
-        return batch_encoding
+        
+        return length, batch_encoding
     
     def get_num(self, ticker_index, date_index):
 
