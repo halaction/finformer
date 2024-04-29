@@ -3,8 +3,6 @@ from tqdm.auto import tqdm
 from dotenv import load_dotenv
 import pandas as pd
 import torch
-import yaml
-import re
 from itertools import product
 
 from huggingface_hub import login, hf_hub_download
@@ -12,7 +10,7 @@ from transformers import AutoTokenizer
 from torch.utils.data import Dataset
 from sklearn.preprocessing import LabelEncoder
 
-from finformer.utils import FinformerConfig, snake_case
+from finformer.utils import FinformerConfig, snake_case, cat_dict
 
 
 config = FinformerConfig()
@@ -22,8 +20,13 @@ SOURCE_DIR = config.dirs.source_dir
 
 
 def collate_fn(batch):
-    
-    return batch
+
+    ticker_index, date_index, lengths, batch_text, batch_num = zip(*batch)
+
+    batch_text = cat_dict(batch_text, pad=True)
+    batch_num = cat_dict(batch_num, pad=False)
+
+    return ticker_index, date_index, lengths, batch_text, batch_num
 
 
 class FinformerData:
