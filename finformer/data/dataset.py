@@ -385,9 +385,6 @@ class FinformerDataset(Dataset):
         length, batch_text = self.get_text(ticker_index, date_index)
         batch_num = self.get_num(ticker_index, date_index)
 
-        for key, value in batch_text.items():
-            batch_text[key] = value.unsqueeze(0)
-
         for key, value in batch_num.items():
             batch_num[key] = value.unsqueeze(0)
 
