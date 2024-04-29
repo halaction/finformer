@@ -385,6 +385,12 @@ class FinformerDataset(Dataset):
         length, batch_text = self.get_text(ticker_index, date_index)
         batch_num = self.get_num(ticker_index, date_index)
 
+        for key, value in batch_text.items():
+            batch_text[key] = value.unsqueeze(0)
+
+        for key, value in batch_num.items():
+            batch_num[key] = value.unsqueeze(0)
+
         return length, batch_text, batch_num
 
     def get_text(self, ticker_index, date_index):
@@ -414,7 +420,7 @@ class FinformerDataset(Dataset):
 
             _date_index = df_text.index.get_level_values('timestamp').floor(freq='D').values.astype(int)
             _date_index = _date_index // self.timestamp_freq - self.start_date_int
-            _date_index = torch.tensor(_date_index, dtype=torch.int64).unsqueeze(0)
+            _date_index = torch.tensor(_date_index, dtype=torch.int64)
 
             batch_encoding['date_index'] = _date_index
         
@@ -428,8 +434,8 @@ class FinformerDataset(Dataset):
         future_values = batch_values[:, self.config.params.context_length:, :]
 
         batch_time_features = self.get_batch_time_features(ticker_index, date_index)
-        past_time_features = batch_time_features[:, :self.config.params.context_length, :]
-        future_time_features = batch_time_features[:, self.config.params.context_length:, :]
+        past_time_features = batch_time_features[:self.config.params.context_length, :]
+        future_time_features = batch_time_features[self.config.params.context_length:, :]
 
         static_categorical_features = self.get_static_categorical_features(ticker_index)
         static_real_features = self.get_static_real_features(ticker_index)
@@ -450,8 +456,8 @@ class FinformerDataset(Dataset):
         columns = ['open', 'close']
         df_batch_values = self.data.prices.loc[pd.IndexSlice[ticker_index, date_index], columns]
 
-        # [B, C + P, N]
-        batch_values = torch.tensor(df_batch_values.values, dtype=torch.float64).unsqueeze(0)
+        # [C + P, N]
+        batch_values = torch.tensor(df_batch_values.values, dtype=torch.float64)
 
         return batch_values
 
@@ -466,8 +472,8 @@ class FinformerDataset(Dataset):
         _batch_time_features = self._get_batch_time_features(date_index)
         _batch_dynamic_real_features = self._get_batch_dynamic_real_features(ticker_index, date_index)
 
-        # [B, C + P, N]
-        batch_time_features = torch.concat([_batch_time_features, _batch_dynamic_real_features], dim=2)
+        # [C + P, N]
+        batch_time_features = torch.concat([_batch_time_features, _batch_dynamic_real_features], dim=1)
 
         return batch_time_features
 
@@ -488,8 +494,8 @@ class FinformerDataset(Dataset):
 
         df_batch_time_features = self.data.calendar.loc[date_index, columns]
 
-        # [B, C + P, N]
-        batch_time_features = torch.tensor(df_batch_time_features.values.astype('float'), dtype=torch.float64).unsqueeze(0)
+        # [C + P, N]
+        batch_time_features = torch.tensor(df_batch_time_features.values.astype('float'), dtype=torch.float64)
 
         return batch_time_features
 
@@ -520,8 +526,8 @@ class FinformerDataset(Dataset):
             .reindex(date_index, method='ffill')
         )
 
-        # [B, C + P, N]
-        batch_dynamic_real_features = torch.tensor(df_batch_dynamic_real_features.values, dtype=torch.float64).unsqueeze(0)
+        # [C + P, N]
+        batch_dynamic_real_features = torch.tensor(df_batch_dynamic_real_features.values, dtype=torch.float64)
 
         return batch_dynamic_real_features
 
@@ -530,8 +536,8 @@ class FinformerDataset(Dataset):
         columns = ['symbol_id', 'sector_id', 'industry_id', 'country_id']
         df_static_categorical_features = self.data.profile.loc[ticker_index, columns]
 
-        # [B, N]
-        static_categorical_features = torch.tensor(df_static_categorical_features.values.astype('int'), dtype=torch.int64).unsqueeze(0)
+        # [N, ]
+        static_categorical_features = torch.tensor(df_static_categorical_features.values.astype('int'), dtype=torch.int64)
 
         return static_categorical_features
 
@@ -540,8 +546,8 @@ class FinformerDataset(Dataset):
         columns = ['age_ipo']
         df_static_real_features = self.data.profile.loc[ticker_index, columns]
 
-        # [B, N]
-        static_real_features = torch.tensor(df_static_real_features.values.astype('float'), dtype=torch.float64).unsqueeze(0)
+        # [N, ]
+        static_real_features = torch.tensor(df_static_real_features.values.astype('float'), dtype=torch.float64)
 
         return static_real_features
     
