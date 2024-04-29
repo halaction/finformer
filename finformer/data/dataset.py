@@ -152,6 +152,8 @@ class FinformerData:
         df.set_index(level, inplace=True)
         df.sort_index(level=level, ascending=True, inplace=True)
 
+        df[['title', 'text']] = df.fillna('')
+
         return df
 
     def get_prices(self):
