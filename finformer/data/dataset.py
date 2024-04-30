@@ -70,7 +70,7 @@ class FinformerCollator:
 
         return padded_tensor
 
-    def _collate_batch_text(self, batch_text):
+    def _collate_batch_text(self, batch_text, date_ids):
 
         keys = None
 
@@ -87,7 +87,7 @@ class FinformerCollator:
 
                 # TODO: Avoid copies and delete input batch
 
-        output_split = list()
+        output_values = list()
 
         # Pad and concatenate tensors inside dict
         for key, values in output.items():
@@ -97,11 +97,18 @@ class FinformerCollator:
                 
             values = [self.right_zero_pad(value, max_length, dim=1) for value in values]
 
-            values_cat = torch.cat(values, dim=0)
-            values_split = torch.split(values_cat, self.config.sentiment_model.max_batch_size, dim=0)
-            output[key] = values_split
+            values_split = torch.cat(values, dim=0).split(self.config.sentiment_model.max_batch_size, dim=0)
 
-        return output
+            output_values.append(values_split)
+
+        batch_text = list(map(
+            lambda output_split: dict(zip(keys, output_split)), 
+            zip(*output_values)
+        ))
+
+        date_ids = torch.cat(date_ids, dim=0).split(self.config.sentiment_model.max_batch_size, dim=0)
+
+        return batch_text, date_ids
     
     def _collate_batch_num(self, batch_num):
 
@@ -128,7 +135,8 @@ class FinformerCollator:
 
         batch_text, batch_num, tickers, date_offsets, date_ids, lengths = zip(*batch)
 
-        batch_text = self._collate_batch_text(batch_text)
+        batch_text, date_ids = self._collate_batch_text(batch_text, date_ids)
+
         batch_num = self._collate_batch_num(batch_num)
 
         collated_batch = FinformerBatch(
@@ -170,19 +178,6 @@ class FinformerDataset(Dataset):
 
         self.tokenizer = self._get_tokenizer()
 
-    def __len__(self):
-        return len(self._index)
-
-    def __getitem__(self, idx):
-        ticker, date_offset = self._index[idx]
-
-        ticker_index = ticker
-        date_index = self.batch_date_index + pd.to_timedelta(date_offset, unit='D')
-
-        batch_text, batch_num, date_ids, length = self.get_batch(ticker_index, date_index)
-
-        return batch_text, batch_num, ticker, date_offset, date_ids, length
-    
     def _get_tokenizer(self):
 
         tokenizer = AutoTokenizer.from_pretrained(self.config.sentiment_model.pretrained_model_name)
@@ -199,6 +194,21 @@ class FinformerDataset(Dataset):
         _index = list(product(ticker_index, date_offset_index))
 
         return _index
+
+    def __len__(self):
+        return len(self._index)
+
+    def __getitem__(self, idx):
+        ticker, date_offset = self._index[idx]
+
+        ticker_index = ticker
+        date_index = self.batch_date_index + pd.to_timedelta(date_offset, unit='D')
+
+        batch_text, batch_num, date_ids, length = self.get_batch(ticker_index, date_index)
+
+        date_ids -= date_offset
+
+        return batch_text, batch_num, ticker, date_offset, date_ids, length
 
     def get_batch(self, ticker_index, date_index):
 
