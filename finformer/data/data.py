@@ -29,6 +29,9 @@ class FinformerData:
 
         os.makedirs(self.config.dirs.dataset_dir, exist_ok=True)
 
+        self.features = dict()
+        self.label_encoders = dict()
+
         if hf_token is None:
             load_dotenv()
             hf_token = os.environ['HF_TOKEN']
@@ -113,6 +116,110 @@ class FinformerData:
         changes = df.loc[:, ['oldSymbol', 'newSymbol']]
 
         return changes
+    
+    def get_profile(self):
+
+        key = 'profile'
+        df = self._load_csv(key)
+
+        df.drop_duplicates(inplace=True)
+
+        condition = df['symbol'].isin(self.tickers)
+        columns = ['symbol', 'industry', 'sector', 'country', 'ipoDate']
+
+        df = df.loc[condition, columns]
+
+        df = df.rename(columns={
+            'symbol': 'ticker',
+            'ipoDate': 'date_ipo',
+        })
+
+        df['date_ipo'] = pd.to_datetime(df['date_ipo'], format='%Y-%m-%d')
+        df['_max_date_ipo'] = df['date_ipo'].max()
+
+        df['age_ipo'] = (df['_max_date_ipo'] - df['date_ipo']).dt.days
+
+        df = df.drop(columns=['date_ipo', '_max_date_ipo'])
+
+        # Hard-coding missing values
+        df.loc[df['ticker'] == 'SOLV', 'sector'] = 'Healthcare'
+        df.loc[df['ticker'] == 'SOLV', 'industry'] = 'Medical - Healthcare Information Services'
+        df.loc[df['country'].isna(), 'country'] = 'US'
+
+        df['symbol'] = df['ticker']
+
+        levels = ['ticker', ]
+        df.set_index(levels, inplace=True)
+        df.sort_index(level=levels, ascending=True, inplace=True)
+
+        columns = ['symbol', 'sector', 'industry', 'country']
+        label_encoders = {column: LabelEncoder() for column in columns}
+
+        for column, encoder in label_encoders.items():
+            df[column] = encoder.fit_transform(df[column])
+
+        self.features['static_categorical_features'] = columns
+        self.features['static_real_features'] = ['age_ipo', ]
+
+        return df
+
+    def get_metrics(self):
+
+        key = 'metrics'
+        df = self._load_csv(key)
+
+        df.drop_duplicates(inplace=True)
+
+        condition = df['symbol'].isin(self.tickers)
+
+        index = ['symbol', 'date']
+        features = [
+            'revenuePerShare',
+            'netIncomePerShare',
+            'marketCap',
+            'peRatio',
+            'priceToSalesRatio',
+            'pocfratio',
+            'pfcfRatio',
+            'pbRatio',
+            'ptbRatio',
+            'debtToEquity',
+            'debtToAssets',
+            'currentRatio',
+            'interestCoverage',
+            'incomeQuality',
+            'salesGeneralAndAdministrativeToRevenue',
+            'researchAndDdevelopementToRevenue',
+            'intangiblesToTotalAssets',
+            'capexToOperatingCashFlow',
+            'capexToDepreciation',
+            'investedCapital',
+        ]
+
+        columns = index + features
+
+        df = df.loc[condition, columns]
+
+        df = df.rename(columns={
+            'symbol': 'ticker',
+        })
+
+        df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d').dt.date
+        df['start_date'] = df['date']
+
+        levels = ['ticker', 'date']
+        df.set_index(levels, inplace=True)
+        df.sort_index(level=levels, ascending=True, inplace=True)
+
+        df['end_date'] = df.groupby(level='ticker')['start_date'].shift(periods=-1, fill_value=self.end_date)
+        df['end_date'] = df['end_date'] - pd.to_timedelta(1, unit='D')
+
+        condition_date = (df['end_date'] >= self.start_date) & (df['start_date'] <= self.end_date)
+        df = df.loc[condition_date, :]
+
+        self.features['dynamic_real_features'] = features
+
+        return df
 
     def get_news(self):
 
@@ -153,7 +260,10 @@ class FinformerData:
         df.drop_duplicates(subset=['symbol', 'date'], inplace=True)
 
         condition = df['symbol'].isin(self.tickers)
-        columns = ['symbol', 'date', 'open', 'high', 'low', 'close', 'volume']
+        index = ['symbol', 'date']
+        features = ['open', 'close', 'low', 'high', 'volume']
+
+        columns = index + features
 
         df = df.loc[condition, columns]
 
@@ -183,114 +293,7 @@ class FinformerData:
 
         df = df.reindex(index)
 
-        return df
-
-    def get_profile(self):
-
-        key = 'profile'
-        df = self._load_csv(key)
-
-        df.drop_duplicates(inplace=True)
-
-        # TODO: Think about what you can do with description w/ or w/o LLM
-
-        condition = df['symbol'].isin(self.tickers)
-        columns = ['symbol', 'industry', 'sector', 'country', 'ipoDate']
-
-        df = df.loc[condition, columns]
-
-        df = df.rename(columns={
-            'symbol': 'ticker',
-            'ipoDate': 'date_ipo',
-        })
-
-        df['date_ipo'] = pd.to_datetime(df['date_ipo'], format='%Y-%m-%d')
-        df['_max_date_ipo'] = df['date_ipo'].max()
-
-        df['age_ipo'] = (df['_max_date_ipo'] - df['date_ipo']).dt.days
-
-        df = df.drop(columns=['date_ipo', '_max_date_ipo'])
-
-        # Hard-coding missing values
-        df.loc[df['ticker'] == 'SOLV', 'sector'] = 'Healthcare'
-        df.loc[df['ticker'] == 'SOLV', 'industry'] = 'Medical - Healthcare Information Services'
-        df.loc[df['country'].isna(), 'country'] = 'US'
-
-        df['symbol'] = df['ticker']
-
-        levels = ['ticker', ]
-        df.set_index(levels, inplace=True)
-        df.sort_index(level=levels, ascending=True, inplace=True)
-
-        columns = ['symbol', 'sector', 'industry', 'country']
-        label_encoders = {column: LabelEncoder() for column in columns}
-
-        for column, encoder in label_encoders.items():
-            df[f'{column}_id'] = encoder.fit_transform(df[column])
-
-        df = df.drop(columns=columns)
-
-        return df
-
-    def get_metrics(self):
-
-        key = 'metrics'
-        df = self._load_csv(key)
-
-        df.drop_duplicates(inplace=True)
-
-        condition = df['symbol'].isin(self.tickers)
-        columns = [
-            'symbol',
-            'date',
-            'calendarYear',
-            'period',
-            'revenuePerShare',
-            'netIncomePerShare',
-            'marketCap',
-            'peRatio',
-            'priceToSalesRatio',
-            'pocfratio',
-            'pfcfRatio',
-            'pbRatio',
-            'ptbRatio',
-            'debtToEquity',
-            'debtToAssets',
-            'currentRatio',
-            'interestCoverage',
-            'incomeQuality',
-            'salesGeneralAndAdministrativeToRevenue',
-            'researchAndDdevelopementToRevenue',
-            'intangiblesToTotalAssets',
-            'capexToOperatingCashFlow',
-            'capexToDepreciation',
-            'investedCapital',
-        ]
-
-        df = df.loc[condition, columns]
-
-        df = df.rename(columns={
-            **{column: snake_case(column) for column in columns},
-            'symbol': 'ticker',
-        })
-
-        df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d').dt.date
-        df['start_date'] = df['date']
-
-        levels = ['ticker', 'date']
-        df.set_index(levels, inplace=True)
-        df.sort_index(level=levels, ascending=True, inplace=True)
-
-        df['end_date'] = df.groupby(level='ticker')['start_date'].shift(periods=-1, fill_value=self.end_date)
-        df['end_date'] = df['end_date'] - pd.to_timedelta(1, unit='D')
-
-        condition_date = (df['end_date'] >= self.start_date) & (df['start_date'] <= self.end_date)
-        df = df.loc[condition_date, :]
-
-        df = df.drop(columns=[
-            'calendar_year',
-            'period',
-        ])
+        self.features['value_features'] = features
 
         return df
 
@@ -313,6 +316,9 @@ class FinformerData:
         levels = ['date', ]
         df.set_index(levels, inplace=True)
         df.sort_index(level=levels, ascending=True, inplace=True)
+
+        features = df.columns
+        self.features['time_features'] = features
 
         return df
     

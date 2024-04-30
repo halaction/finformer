@@ -160,6 +160,8 @@ class FinformerDataset(Dataset):
     def __init__(self, data, config):
 
         self.data = data
+        self.features = data.features
+
         self.config = config
 
         self.start_date = pd.to_datetime(self.config.params.start_date, format='%Y-%m-%d').date()
@@ -282,7 +284,7 @@ class FinformerDataset(Dataset):
 
     def get_batch_values(self, ticker_index, date_index):
 
-        columns = ['open', 'close']
+        columns = self.features['value_features']
         df_batch_values = self.data.prices.loc[pd.IndexSlice[ticker_index, date_index], columns]
 
         # [C + P, N]
@@ -308,18 +310,7 @@ class FinformerDataset(Dataset):
 
     def _get_batch_time_features(self, date_index):
 
-        columns = [
-            'days_in_month',
-            'is_month_end',
-            'is_quarter_end',
-            'age',
-            'weekday_Monday',
-            'weekday_Saturday',
-            'weekday_Sunday',
-            'weekday_Thursday',
-            'weekday_Tuesday',
-            'weekday_Wednesday',
-        ]
+        columns = self.features['time_features']
 
         df_batch_time_features = self.data.calendar.loc[date_index, columns]
 
@@ -336,16 +327,7 @@ class FinformerDataset(Dataset):
         batch_end = date_index.max().date()
 
         condition = (df_batch_dynamic_real_features['start_date'] <= batch_end) & (df_batch_dynamic_real_features['end_date'] >= batch_start)
-        columns = [
-            'revenue_per_share', 'net_income_per_share', 'market_cap', 'pe_ratio',
-            'price_to_sales_ratio', 'pocfratio', 'pfcf_ratio', 'pb_ratio',
-            'ptb_ratio', 'debt_to_equity', 'debt_to_assets', 'current_ratio',
-            'interest_coverage', 'income_quality',
-            'sales_general_and_administrative_to_revenue',
-            'research_and_ddevelopement_to_revenue', 'intangibles_to_total_assets',
-            'capex_to_operating_cash_flow', 'capex_to_depreciation',
-            'invested_capital',
-        ]
+        columns = self.features['dynamic_real_features']
 
         df_batch_dynamic_real_features = df_batch_dynamic_real_features.loc[condition, columns]
 
@@ -362,7 +344,7 @@ class FinformerDataset(Dataset):
 
     def get_static_categorical_features(self, ticker_index):
 
-        columns = ['symbol_id', 'sector_id', 'industry_id', 'country_id']
+        columns = self.features['static_categorical_features']
         df_static_categorical_features = self.data.profile.loc[ticker_index, columns]
 
         # [N, ]
@@ -372,7 +354,7 @@ class FinformerDataset(Dataset):
 
     def get_static_real_features(self, ticker_index):
 
-        columns = ['age_ipo']
+        columns = self.features['static_real_features']
         df_static_real_features = self.data.profile.loc[ticker_index, columns]
 
         # [N, ]
