@@ -5,12 +5,14 @@ import pandas as pd
 import torch
 from itertools import product
 
+from typing import Dict, List
+
 from huggingface_hub import login, hf_hub_download
 from transformers import AutoTokenizer
 from torch.utils.data import Dataset
 from sklearn.preprocessing import LabelEncoder
 
-from finformer.utils import FinformerConfig, snake_case, cat_dict
+from finformer.utils import FinformerConfig, snake_case, collate_dict
 
 
 config = FinformerConfig()
@@ -21,12 +23,39 @@ SOURCE_DIR = config.dirs.source_dir
 
 def collate_fn(batch):
 
-    ticker_index, date_index, lengths, batch_text, batch_num = zip(*batch)
+    batch_text, batch_num, tickers, date_offsets, lengths = zip(*batch)
 
-    batch_text = cat_dict(batch_text, pad=True)
-    batch_num = cat_dict(batch_num, pad=False)
+    batch_text = collate_dict(batch_text, pad=True)
+    batch_num = collate_dict(batch_num, pad=False)
 
-    return ticker_index, date_index, lengths, batch_text, batch_num
+    collated_batch = FinformerBatch(
+        batch_text=batch_text,
+        batch_num=batch_num,
+        tickers=tickers,
+        date_offsets=date_offsets,
+        lengths=lengths,
+    )
+
+    return collated_batch
+
+
+class FinformerBatch:
+
+    def __init__(
+        self, 
+        batch_text: Dict,
+        batch_num: Dict,
+        tickers: List,
+        date_offsets: List,
+        lengths: List,
+    ):
+        
+        self.batch_text = batch_text
+        self.batch_num = batch_num
+
+        self.tickers = tickers
+        self.date_offsets = date_offsets
+        self.lengths = lengths
 
 
 class FinformerData:
@@ -364,12 +393,14 @@ class FinformerDataset(Dataset):
         ticker_index = ticker
         date_index = self.batch_date_index + pd.to_timedelta(date_offset, unit='D')
 
-        length, batch_text, batch_num = self.get_batch(ticker_index, date_index)
+        batch_text, batch_num, length = self.get_batch(ticker_index, date_index)
 
-        return ticker, date_offset, length, batch_text, batch_num, 
+        return batch_text, batch_num, ticker, date_offset, length
     
     def _get_tokenizer(self):
+
         tokenizer = AutoTokenizer.from_pretrained(self.config.sentiment_model.pretrained_model_name)
+
         return tokenizer
 
     def _get_index(self):
@@ -391,7 +422,7 @@ class FinformerDataset(Dataset):
         for key, value in batch_num.items():
             batch_num[key] = value.unsqueeze(0)
 
-        return length, batch_text, batch_num
+        return batch_text, batch_num, length
 
     def get_text(self, ticker_index, date_index):
 
@@ -424,7 +455,7 @@ class FinformerDataset(Dataset):
 
             batch_encoding['date_index'] = _date_index
         
-        return length, batch_encoding
+        return batch_encoding, length
     
     def get_num(self, ticker_index, date_index):
 
