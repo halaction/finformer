@@ -47,7 +47,7 @@ def right_zero_pad(tensor, max_length, dim=-1):
     return padded_tensor
 
 
-def cat_dict(dict_list, pad=False):
+def collate_dict(dict_list, pad=False):
 
     keys = None
 
