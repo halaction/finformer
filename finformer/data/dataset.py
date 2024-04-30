@@ -106,7 +106,8 @@ class FinformerCollator:
             zip(*output_values)
         ))
 
-        date_ids = torch.cat(filter(None, date_ids), dim=0).split(self.config.sentiment_model.max_batch_size, dim=0)
+        date_ids = list(filter(None, date_ids))
+        date_ids = torch.cat(date_ids, dim=0).split(self.config.sentiment_model.max_batch_size, dim=0)
 
         return batch_text, date_ids
     
