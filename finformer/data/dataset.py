@@ -23,7 +23,7 @@ SOURCE_DIR = config.dirs.source_dir
 
 def collate_fn(batch):
 
-    batch_text, batch_num, tickers, date_offsets, lengths = zip(*batch)
+    batch_text, batch_num, tickers, date_offsets, date_ids, lengths = zip(*batch)
 
     batch_text = collate_dict(batch_text, pad=True)
     batch_num = collate_dict(batch_num, pad=False)
@@ -33,6 +33,7 @@ def collate_fn(batch):
         batch_num=batch_num,
         tickers=tickers,
         date_offsets=date_offsets,
+        date_ids=date_ids,
         lengths=lengths,
     )
 
@@ -47,6 +48,7 @@ class FinformerBatch:
         batch_num: Dict,
         tickers: List,
         date_offsets: List,
+        date_ids: List,
         lengths: List,
     ):
         
@@ -55,6 +57,7 @@ class FinformerBatch:
 
         self.tickers = tickers
         self.date_offsets = date_offsets
+        self.date_ids = date_ids
         self.lengths = lengths
 
 
@@ -393,9 +396,9 @@ class FinformerDataset(Dataset):
         ticker_index = ticker
         date_index = self.batch_date_index + pd.to_timedelta(date_offset, unit='D')
 
-        batch_text, batch_num, length = self.get_batch(ticker_index, date_index)
+        batch_text, batch_num, date_ids, length = self.get_batch(ticker_index, date_index)
 
-        return batch_text, batch_num, ticker, date_offset, length
+        return batch_text, batch_num, ticker, date_offset, date_ids, length
     
     def _get_tokenizer(self):
 
@@ -416,18 +419,19 @@ class FinformerDataset(Dataset):
 
     def get_batch(self, ticker_index, date_index):
 
-        batch_text, length = self.get_text(ticker_index, date_index)
+        batch_text, date_ids, length = self.get_text(ticker_index, date_index)
         batch_num = self.get_num(ticker_index, date_index)
 
         for key, value in batch_num.items():
             batch_num[key] = value.unsqueeze(0)
 
-        return batch_text, batch_num, length
+        return batch_text, batch_num, date_ids, length
 
     def get_text(self, ticker_index, date_index):
 
         batch_start = date_index.min().date()
         batch_end = date_index.max().date()
+
         columns = ['title', 'text']
         df_text = self.data.news.loc[pd.IndexSlice[ticker_index, batch_start:batch_end], columns]
 
@@ -438,6 +442,7 @@ class FinformerDataset(Dataset):
 
         if length == 0:
             batch_encoding = None
+            date_ids = None
         else:
             batch_encoding = self.tokenizer(
                 text=text,
@@ -449,13 +454,11 @@ class FinformerDataset(Dataset):
                 return_tensors='pt',
             )
 
-            _date_index = df_text.index.get_level_values('timestamp').floor(freq='D').values.astype(int)
-            _date_index = _date_index // self.timestamp_freq - self.start_date_int
-            _date_index = torch.tensor(_date_index, dtype=torch.int64)
-
-            batch_encoding['date_index'] = _date_index
+            date_ids = df_text.index.get_level_values('timestamp').floor(freq='D').values.astype(int)
+            date_ids = date_ids // self.timestamp_freq - self.start_date_int
+            date_ids = torch.tensor(date_ids, dtype=torch.int64)
         
-        return batch_encoding, length
+        return batch_encoding, date_ids, length
     
     def get_num(self, ticker_index, date_index):
 
