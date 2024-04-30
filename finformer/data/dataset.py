@@ -206,7 +206,8 @@ class FinformerDataset(Dataset):
 
         batch_text, batch_num, date_ids, length = self.get_batch(ticker_index, date_index)
 
-        date_ids -= date_offset
+        if date_ids is not None:
+            date_ids -= date_offset
 
         return batch_text, batch_num, ticker, date_offset, date_ids, length
 
