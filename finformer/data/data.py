@@ -2,7 +2,6 @@ import os
 from tqdm.auto import tqdm
 from dotenv import load_dotenv
 import pandas as pd
-import json
 
 from huggingface_hub import login, hf_hub_download
 from sklearn.preprocessing import LabelEncoder

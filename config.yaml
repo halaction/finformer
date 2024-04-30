@@ -9,9 +9,10 @@ dirs:
 params:
   batch_size: 4
   context_length: 30
-  end_date: '2024-04-15'
   prediction_length: 15
+  max_lag: 1
   start_date: '2020-01-01'
+  end_date: '2024-04-15'
 features:
   dynamic_real_features:
   - revenuePerShare

@@ -164,8 +164,10 @@ class FinformerDataset(Dataset):
 
         self.start_date = pd.to_datetime(self.config.params.start_date, format='%Y-%m-%d').date()
         self.end_date = pd.to_datetime(self.config.params.end_date, format='%Y-%m-%d').date()
-
-        self.batch_length = self.config.params.context_length + self.config.params.prediction_length
+        
+        self.sequence_length = self.config.params.context_length + self.config.params.max_lag
+        self.prediction_length = self.config.params.prediction_length
+        self.batch_length = self.sequence_length + self.prediction_length
 
         delta = pd.to_timedelta(self.batch_length - 1, unit='D')
         batch_end = self.start_date + delta
@@ -259,21 +261,13 @@ class FinformerDataset(Dataset):
 
         # TODO: Separate batches in dataloader / collate / training to utilize GPU
         batch_values = self.get_batch_values(ticker_index, date_index)
-        past_values = batch_values[:self.config.params.context_length, :]
-        future_values = batch_values[self.config.params.context_length:, :]
-
         batch_time_features = self.get_batch_time_features(ticker_index, date_index)
-        past_time_features = batch_time_features[:self.config.params.context_length, :]
-        future_time_features = batch_time_features[self.config.params.context_length:, :]
-
         static_categorical_features = self.get_static_categorical_features(ticker_index)
         static_real_features = self.get_static_real_features(ticker_index)
 
         batch_num = dict(
-            past_values=past_values,
-            past_time_features=past_time_features,
-            future_values=future_values,
-            future_time_features=future_time_features,
+            batch_values=batch_values,
+            batch_time_features=batch_time_features,
             static_categorical_features=static_categorical_features,
             static_real_features=static_real_features,
         )
