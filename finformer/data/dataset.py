@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer
 
-from finformer.utils import FinformerConfig
+from finformer.utils import FinformerConfig, filter_none
 
 
 config = FinformerConfig()
@@ -106,7 +106,7 @@ class FinformerCollator:
             zip(*output_values)
         ))
 
-        date_ids = list(filter(None, date_ids))
+        date_ids = filter_none(date_ids)
         date_ids = torch.cat(date_ids, dim=0).split(self.config.sentiment_model.max_batch_size, dim=0)
 
         return batch_text, date_ids

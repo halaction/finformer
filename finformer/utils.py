@@ -26,6 +26,17 @@ def adaptive_get(url):
     return response
 
 
+def is_not_none(x):
+        return x is not None
+    
+
+def filter_none(array):
+
+    filtered_array = list(filter(is_not_none, array))
+
+    return filtered_array
+
+
 def snake_case(string: str):
     pattern = re.compile(r'(?<!^)(?=[A-Z])')
     string = pattern.sub('_', string).lower()
