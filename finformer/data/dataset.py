@@ -1,18 +1,13 @@
-import os
-from tqdm.auto import tqdm
-from dotenv import load_dotenv
 import pandas as pd
-import torch
-from itertools import product
-
+from itertools import product, chain
 from typing import Dict, List
 
-from huggingface_hub import login, hf_hub_download
+import torch
+import torch.nn.functional as F
+from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer
-from torch.utils.data import Dataset
-from sklearn.preprocessing import LabelEncoder
 
-from finformer.utils import FinformerConfig, snake_case, collate_dict
+from finformer.utils import FinformerConfig
 
 
 config = FinformerConfig()
@@ -21,23 +16,18 @@ DATA_DIR = config.dirs.data_dir
 SOURCE_DIR = config.dirs.source_dir
 
 
-def collate_fn(batch):
+def get_dataloader(config, dataset):
 
-    batch_text, batch_num, tickers, date_offsets, date_ids, lengths = zip(*batch)
+    collate_fn = FinformerCollator(config)
 
-    batch_text = collate_dict(batch_text, pad=True)
-    batch_num = collate_dict(batch_num, pad=False)
-
-    collated_batch = FinformerBatch(
-        batch_text=batch_text,
-        batch_num=batch_num,
-        tickers=tickers,
-        date_offsets=date_offsets,
-        date_ids=date_ids,
-        lengths=lengths,
+    dataloader = DataLoader(
+        dataset=dataset, 
+        batch_size=config.params.batch_size, 
+        shuffle=True, 
+        collate_fn=collate_fn,
     )
 
-    return collated_batch
+    return dataloader
 
 
 class FinformerBatch:
@@ -61,307 +51,98 @@ class FinformerBatch:
         self.lengths = lengths
 
 
-class FinformerData:
+class FinformerCollator:
 
-    def __init__(self, config, hf_token=None, force=False):
-
+    def __init__(self, config):
         self.config = config
 
-        self.start_date = pd.to_datetime(self.config.params.start_date, format='%Y-%m-%d').date()
-        self.end_date = pd.to_datetime(self.config.params.end_date, format='%Y-%m-%d').date()
-        self.date_index = pd.date_range(start=self.start_date, end=self.end_date, freq='D')
-
-        self.keys = ['tickers', 'changes', 'profile', 'metrics', 'prices', 'news', 'calendar']
-
-        os.makedirs(self.config.dirs.dataset_dir, exist_ok=True)
-
-        if hf_token is None:
-            load_dotenv()
-            hf_token = os.environ['HF_TOKEN']
-
-        login(token=hf_token)
-
-        self.load(force=force)
-        self.save(force=force)
-
-    def load(self, force=False):
-
-        progress_bar = tqdm(self.keys)
-        for key in progress_bar:
-            progress_bar.set_description(desc=f'LOADING (key={key})')
-
-            path = os.path.join(self.config.dirs.dataset_dir, f'{key}.pkl')
-            exists = os.path.exists(path)
-
-            if exists and not force:
-                df = pd.read_pickle(path)
-            else:
-                df = self._get_data(key)
-
-            setattr(self, key, df)
-
-    def save(self, force=False):
-
-        progress_bar = tqdm(self.keys)
-        for key in progress_bar:
-            progress_bar.set_description(desc=f'SAVING (key={key})')
-
-            path = os.path.join(self.config.dirs.dataset_dir, f'{key}.pkl')
-            exists = os.path.exists(path)
-
-            if not exists or force:
-                df = getattr(self, key)
-                df.to_pickle(path)
-
-    def _load_csv(self, key):
-
-        filename = os.path.join(self.config.hf.dataset_dir, f'{key}.csv')
-        path = hf_hub_download(repo_id=self.config.hf.repo_id, filename=filename, repo_type='dataset')
-        df = pd.read_csv(path)
-
-        return df
-    
-    def _get_data(self, key):
-
-        if key == 'tickers':
-            df = self.get_tickers()
-        elif key == 'changes':
-            df = self.get_changes()
-        elif key == 'profile':
-            df = self.get_profile()
-        elif key == 'metrics':
-            df = self.get_metrics()
-        elif key == 'prices':
-            df = self.get_prices()
-        elif key == 'news':
-            df = self.get_news()
-        elif key == 'calendar':
-            df = self.get_calendar()
-        else:
-            raise ValueError(f'Unknown key `{key}` is provided.')
-
-        return df
-
-    def get_tickers(self):
-
-        key = 'tickers'
-        df = self._load_csv(key)
-
-        tickers = pd.Series(df['symbol'].unique())
-
-        return tickers
-    
-    def get_changes(self):
+    @staticmethod
+    def right_zero_pad(tensor, max_length, dim=-1):
         
-        key = 'changes'
-        df = self._load_csv(key)
+        if tensor.size(dim) < max_length:
+            pad = [(0, 0) for _ in range(tensor.dim())]
+            pad[dim] = (0, max_length - tensor.size(dim))
+            pad = tuple(chain.from_iterable(pad[::-1]))
 
-        changes = df.loc[:, ['oldSymbol', 'newSymbol']]
+            padded_tensor = F.pad(tensor, pad, 'constant', 0)
+        else:
+            padded_tensor = tensor
 
-        return changes
+        return padded_tensor
 
-    def get_news(self):
+    def _collate_batch_text(self, batch_text):
 
-        key = 'news'
-        df = self._load_csv(key)
+        keys = None
 
-        df.drop_duplicates(inplace=True)
+        # Convert array of dicts to dict of arrays
+        for batch_item in batch_text:
+            if batch_item is not None:
+                if keys is None:
+                    keys = batch_item.keys()
+                    output = {key: list() for key in keys}
 
-        condition = df['symbol'].isin(self.tickers)
-        columns = ['symbol', 'publishedDate', 'title', 'text']
+                for key in keys:
+                    value = batch_item[key]
+                    output[key].append(value)
 
-        df = df.loc[condition, columns]
+                # TODO: Avoid copies and delete input batch
 
-        df = df.rename(columns={
-            'symbol': 'ticker',
-            'publishedDate': 'timestamp',
-        })
+        # Pad and concatenate tensors inside dict
+        for key, values in output.items():
 
-        df['timestamp'] = pd.to_datetime(df['timestamp'], format='%Y-%m-%d %H:%M:%S')
-        df['date'] = df['timestamp'].dt.date
+            lengths = [value.size(1) for value in values]
+            max_length = max(lengths)
+                
+            values = [self.right_zero_pad(value, max_length, dim=1) for value in values]
 
-        condition_date = (df['date'] >= self.start_date) & (df['date'] <= self.end_date)
-        df = df.loc[condition_date, :]
+            values_cat = torch.cat(values, dim=0)
+            values_split = torch.split(values_cat, self.config.sentiment_model.max_batch_size)
+            output[key] = values_split
 
-        level = ['ticker', 'timestamp']
-        df.set_index(level, inplace=True)
-        df.sort_index(level=level, ascending=True, inplace=True)
+        return output
+    
+    def _collate_batch_num(self, batch_num):
 
-        df[['title', 'text']] = df[['title', 'text']].fillna('')
+        keys = None
 
-        return df
+        # Convert array of dicts to dict of arrays
+        for batch_item in batch_num:
+            if batch_item is not None:
+                if keys is None:
+                    keys = batch_item.keys()
+                    output = {key: list() for key in keys}
 
-    def get_prices(self):
+                for key in keys:
+                    value = batch_item[key]
+                    output[key].append(value)
 
-        key = 'prices'
-        df = self._load_csv(key)
+        # Concatenate tensors in dict
+        for key, values in output.items():
+            output[key] = torch.cat(values, dim=0)
 
-        df.drop_duplicates(subset=['symbol', 'date'], inplace=True)
+        return output
 
-        condition = df['symbol'].isin(self.tickers)
-        columns = ['symbol', 'date', 'open', 'high', 'low', 'close', 'volume']
+    def collate_fn(self, batch):
 
-        df = df.loc[condition, columns]
+        batch_text, batch_num, tickers, date_offsets, date_ids, lengths = zip(*batch)
 
-        df = df.rename(columns={
-            'symbol': 'ticker',
-            'date': 'timestamp',
-        })
+        batch_text = self._collate_batch_text(batch_text)
+        batch_num = self._collate_batch_num(batch_num)
 
-        df['timestamp'] = pd.to_datetime(df['timestamp'], format='%Y-%m-%d')
-        df['date'] = df['timestamp'].dt.date
-
-        condition_date = (df['date'] >= self.start_date) & (df['date'] <= self.end_date)
-        df = df.loc[condition_date, :]
-
-        df = df.drop(columns=['timestamp', ])
-
-        levels = ['ticker', 'date']
-        df.set_index(levels, inplace=True)
-        df.sort_index(level=levels, ascending=True, inplace=True)
-
-        df = df.loc[pd.IndexSlice[:, self.start_date:self.end_date], :]
-
-        index = pd.MultiIndex.from_product(
-            [df.index.get_level_values('ticker').unique(), self.date_index],
-            names=levels,
+        collated_batch = FinformerBatch(
+            batch_text=batch_text,
+            batch_num=batch_num,
+            tickers=tickers,
+            date_offsets=date_offsets,
+            date_ids=date_ids,
+            lengths=lengths,
         )
 
-        df = df.reindex(index)
+        return collated_batch
 
-        return df
+    def __call__(self, batch):
+        return self.collate_fn(batch)
 
-    def get_profile(self):
-
-        key = 'profile'
-        df = self._load_csv(key)
-
-        df.drop_duplicates(inplace=True)
-
-        # TODO: Think about what you can do with description w/ or w/o LLM
-
-        condition = df['symbol'].isin(self.tickers)
-        columns = ['symbol', 'industry', 'sector', 'country', 'ipoDate']
-
-        df = df.loc[condition, columns]
-
-        df = df.rename(columns={
-            'symbol': 'ticker',
-            'ipoDate': 'date_ipo',
-        })
-
-        df['date_ipo'] = pd.to_datetime(df['date_ipo'], format='%Y-%m-%d')
-        df['_max_date_ipo'] = df['date_ipo'].max()
-
-        df['age_ipo'] = (df['_max_date_ipo'] - df['date_ipo']).dt.days
-
-        df = df.drop(columns=['date_ipo', '_max_date_ipo'])
-
-        # Hard-coding missing values
-        df.loc[df['ticker'] == 'SOLV', 'sector'] = 'Healthcare'
-        df.loc[df['ticker'] == 'SOLV', 'industry'] = 'Medical - Healthcare Information Services'
-        df.loc[df['country'].isna(), 'country'] = 'US'
-
-        df['symbol'] = df['ticker']
-
-        levels = ['ticker', ]
-        df.set_index(levels, inplace=True)
-        df.sort_index(level=levels, ascending=True, inplace=True)
-
-        columns = ['symbol', 'sector', 'industry', 'country']
-        label_encoders = {column: LabelEncoder() for column in columns}
-
-        for column, encoder in label_encoders.items():
-            df[f'{column}_id'] = encoder.fit_transform(df[column])
-
-        df = df.drop(columns=columns)
-
-        return df
-
-    def get_metrics(self):
-
-        key = 'metrics'
-        df = self._load_csv(key)
-
-        df.drop_duplicates(inplace=True)
-
-        condition = df['symbol'].isin(self.tickers)
-        columns = [
-            'symbol',
-            'date',
-            'calendarYear',
-            'period',
-            'revenuePerShare',
-            'netIncomePerShare',
-            'marketCap',
-            'peRatio',
-            'priceToSalesRatio',
-            'pocfratio',
-            'pfcfRatio',
-            'pbRatio',
-            'ptbRatio',
-            'debtToEquity',
-            'debtToAssets',
-            'currentRatio',
-            'interestCoverage',
-            'incomeQuality',
-            'salesGeneralAndAdministrativeToRevenue',
-            'researchAndDdevelopementToRevenue',
-            'intangiblesToTotalAssets',
-            'capexToOperatingCashFlow',
-            'capexToDepreciation',
-            'investedCapital',
-        ]
-
-        df = df.loc[condition, columns]
-
-        df = df.rename(columns={
-            **{column: snake_case(column) for column in columns},
-            'symbol': 'ticker',
-        })
-
-        df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d').dt.date
-        df['start_date'] = df['date']
-
-        levels = ['ticker', 'date']
-        df.set_index(levels, inplace=True)
-        df.sort_index(level=levels, ascending=True, inplace=True)
-
-        df['end_date'] = df.groupby(level='ticker')['start_date'].shift(periods=-1, fill_value=self.end_date)
-        df['end_date'] = df['end_date'] - pd.to_timedelta(1, unit='D')
-
-        condition_date = (df['end_date'] >= self.start_date) & (df['start_date'] <= self.end_date)
-        df = df.loc[condition_date, :]
-
-        df = df.drop(columns=[
-            'calendar_year',
-            'period',
-        ])
-
-        return df
-
-    def get_calendar(self):
-
-        df = pd.DataFrame(self.date_index, columns=['date'])
-
-        df['weekday'] = df['date'].dt.day_name()
-        df['month'] = df['date'].dt.month_name()
-        df['days_in_month'] = df['date'].dt.days_in_month
-        df['is_month_end'] = df['date'].dt.is_month_end
-        df['quarter'] = df['date'].dt.quarter
-        df['is_quarter_end'] = df['date'].dt.is_quarter_end
-        start_year = pd.to_datetime(self.config.params.start_date, format='%Y-%m-%d').year
-        df['age'] = df['date'].dt.year - start_year
-
-        columns = ['weekday', 'month', 'quarter']
-        df = pd.get_dummies(df, columns=columns, drop_first=True)
-
-        levels = ['date', ]
-        df.set_index(levels, inplace=True)
-        df.sort_index(level=levels, ascending=True, inplace=True)
-
-        return df
-    
 
 class FinformerDataset(Dataset):
 
