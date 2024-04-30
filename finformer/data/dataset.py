@@ -87,6 +87,8 @@ class FinformerCollator:
 
                 # TODO: Avoid copies and delete input batch
 
+        output_split = list()
+
         # Pad and concatenate tensors inside dict
         for key, values in output.items():
 
@@ -96,7 +98,7 @@ class FinformerCollator:
             values = [self.right_zero_pad(value, max_length, dim=1) for value in values]
 
             values_cat = torch.cat(values, dim=0)
-            values_split = torch.split(values_cat, self.config.sentiment_model.max_batch_size)
+            values_split = torch.split(values_cat, self.config.sentiment_model.max_batch_size, dim=0)
             output[key] = values_split
 
         return output
