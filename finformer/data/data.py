@@ -31,7 +31,6 @@ class FinformerData:
         os.makedirs(self.config.dirs.dataset_dir, exist_ok=True)
 
         # self.features = self._get_features()
-        self.features = self.config.features
 
         if hf_token is None:
             load_dotenv()
@@ -146,7 +145,7 @@ class FinformerData:
 
     def _get_label_encoders(self):
 
-        columns = self.features['static_categorical_features']
+        columns = self.config.features.static_categorical_features
         label_encoders = {column: LabelEncoder() for column in columns}
 
         for column, encoder in label_encoders.items():
@@ -248,7 +247,7 @@ class FinformerData:
         condition = df['symbol'].isin(self.tickers)
 
         index = ['symbol', 'date']
-        features = self.features['dynamic_real_features']
+        features = self.config.features.dynamic_real_features
 
         columns = index + features
 
@@ -313,7 +312,7 @@ class FinformerData:
 
         condition = df['symbol'].isin(self.tickers)
         index = ['symbol', 'date']
-        features = self.features['value_features']
+        features = self.config.features.value_features
 
         columns = index + features
 
@@ -368,7 +367,7 @@ class FinformerData:
         df.sort_index(level=levels, ascending=True, inplace=True)
 
         features = df.columns
-        self.features['time_features'] = features
+        self.config.features.time_features = features
 
         return df
     
