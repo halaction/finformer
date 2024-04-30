@@ -12,6 +12,66 @@ params:
   end_date: '2024-04-15'
   prediction_length: 15
   start_date: '2020-01-01'
+features:
+  dynamic_real_features:
+  - revenuePerShare
+  - netIncomePerShare
+  - marketCap
+  - peRatio
+  - priceToSalesRatio
+  - pocfratio
+  - pfcfRatio
+  - pbRatio
+  - ptbRatio
+  - debtToEquity
+  - debtToAssets
+  - currentRatio
+  - interestCoverage
+  - incomeQuality
+  - salesGeneralAndAdministrativeToRevenue
+  - researchAndDdevelopementToRevenue
+  - intangiblesToTotalAssets
+  - capexToOperatingCashFlow
+  - capexToDepreciation
+  - investedCapital
+  static_categorical_features:
+  - symbol
+  - industry
+  - sector
+  - country
+  static_real_features:
+  - age_ipo
+  time_features:
+  - days_in_month
+  - is_month_end
+  - is_quarter_end
+  - age
+  - weekday_Monday
+  - weekday_Saturday
+  - weekday_Sunday
+  - weekday_Thursday
+  - weekday_Tuesday
+  - weekday_Wednesday
+  - month_August
+  - month_December
+  - month_February
+  - month_January
+  - month_July
+  - month_June
+  - month_March
+  - month_May
+  - month_November
+  - month_October
+  - month_September
+  - quarter_2
+  - quarter_3
+  - quarter_4
+  value_features:
+  - open
+  - close
+  - low
+  - high
+  - volume
 sentiment_model:
   pretrained_model_name: ProsusAI/finbert
   max_batch_size: 16

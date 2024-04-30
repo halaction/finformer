@@ -2,6 +2,7 @@ import os
 from tqdm.auto import tqdm
 from dotenv import load_dotenv
 import pandas as pd
+import json
 
 from huggingface_hub import login, hf_hub_download
 from sklearn.preprocessing import LabelEncoder
@@ -29,8 +30,8 @@ class FinformerData:
 
         os.makedirs(self.config.dirs.dataset_dir, exist_ok=True)
 
-        self.features = dict()
-        self.label_encoders = dict()
+        # self.features = self._get_features()
+        self.features = self.config.features
 
         if hf_token is None:
             load_dotenv()
@@ -40,6 +41,8 @@ class FinformerData:
 
         self.load(force=force)
         self.save(force=force)
+
+        self.label_encoders = self._get_label_encoders()
 
     def load(self, force=False):
 
@@ -69,6 +72,87 @@ class FinformerData:
             if not exists or force:
                 df = getattr(self, key)
                 df.to_pickle(path)
+
+    def _get_features(self):
+        
+        features = dict()
+
+        # Profile
+        features['static_categorical_features'] = ['symbol', 'industry', 'sector', 'country']
+        features['static_real_features'] = ['age_ipo', ]
+
+        # Metrics
+        features['dynamic_real_features'] = [
+            'revenuePerShare',
+            'netIncomePerShare',
+            'marketCap',
+            'peRatio',
+            'priceToSalesRatio',
+            'pocfratio',
+            'pfcfRatio',
+            'pbRatio',
+            'ptbRatio',
+            'debtToEquity',
+            'debtToAssets',
+            'currentRatio',
+            'interestCoverage',
+            'incomeQuality',
+            'salesGeneralAndAdministrativeToRevenue',
+            'researchAndDdevelopementToRevenue',
+            'intangiblesToTotalAssets',
+            'capexToOperatingCashFlow',
+            'capexToDepreciation',
+            'investedCapital',
+        ]
+
+        # News
+        features['value_features'] = [
+            'open', 
+            'close', 
+            'low', 
+            'high', 
+            'volume'
+        ]
+
+        # Calendar
+        features['time_features'] = [
+            'days_in_month',
+            'is_month_end',
+            'is_quarter_end',
+            'age',
+            'weekday_Monday',
+            'weekday_Saturday',
+            'weekday_Sunday',
+            'weekday_Thursday',
+            'weekday_Tuesday',
+            'weekday_Wednesday',
+            'month_August',
+            'month_December',
+            'month_February',
+            'month_January',
+            'month_July',
+            'month_June',
+            'month_March',
+            'month_May',
+            'month_November',
+            'month_October',
+            'month_September',
+            'quarter_2',
+            'quarter_3',
+            'quarter_4',
+        ]
+        
+        return features
+
+    def _get_label_encoders(self):
+
+        columns = self.features['static_categorical_features']
+        label_encoders = {column: LabelEncoder() for column in columns}
+
+        for column, encoder in label_encoders.items():
+            self.profile[column] = encoder.fit_transform(self.profile[column])
+
+        return label_encoders
 
     def _load_csv(self, key):
 
@@ -152,15 +236,6 @@ class FinformerData:
         df.set_index(levels, inplace=True)
         df.sort_index(level=levels, ascending=True, inplace=True)
 
-        columns = ['symbol', 'sector', 'industry', 'country']
-        label_encoders = {column: LabelEncoder() for column in columns}
-
-        for column, encoder in label_encoders.items():
-            df[column] = encoder.fit_transform(df[column])
-
-        self.features['static_categorical_features'] = columns
-        self.features['static_real_features'] = ['age_ipo', ]
-
         return df
 
     def get_metrics(self):
@@ -173,28 +248,7 @@ class FinformerData:
         condition = df['symbol'].isin(self.tickers)
 
         index = ['symbol', 'date']
-        features = [
-            'revenuePerShare',
-            'netIncomePerShare',
-            'marketCap',
-            'peRatio',
-            'priceToSalesRatio',
-            'pocfratio',
-            'pfcfRatio',
-            'pbRatio',
-            'ptbRatio',
-            'debtToEquity',
-            'debtToAssets',
-            'currentRatio',
-            'interestCoverage',
-            'incomeQuality',
-            'salesGeneralAndAdministrativeToRevenue',
-            'researchAndDdevelopementToRevenue',
-            'intangiblesToTotalAssets',
-            'capexToOperatingCashFlow',
-            'capexToDepreciation',
-            'investedCapital',
-        ]
+        features = self.features['dynamic_real_features']
 
         columns = index + features
 
@@ -216,8 +270,6 @@ class FinformerData:
 
         condition_date = (df['end_date'] >= self.start_date) & (df['start_date'] <= self.end_date)
         df = df.loc[condition_date, :]
-
-        self.features['dynamic_real_features'] = features
 
         return df
 
@@ -261,7 +313,7 @@ class FinformerData:
 
         condition = df['symbol'].isin(self.tickers)
         index = ['symbol', 'date']
-        features = ['open', 'close', 'low', 'high', 'volume']
+        features = self.features['value_features']
 
         columns = index + features
 
@@ -292,8 +344,6 @@ class FinformerData:
         )
 
         df = df.reindex(index)
-
-        self.features['value_features'] = features
 
         return df
 
