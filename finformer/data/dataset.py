@@ -416,7 +416,7 @@ class FinformerDataset(Dataset):
 
     def get_batch(self, ticker_index, date_index):
 
-        length, batch_text = self.get_text(ticker_index, date_index)
+        batch_text, length = self.get_text(ticker_index, date_index)
         batch_num = self.get_num(ticker_index, date_index)
 
         for key, value in batch_num.items():
