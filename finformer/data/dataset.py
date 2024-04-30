@@ -160,8 +160,6 @@ class FinformerDataset(Dataset):
     def __init__(self, data, config):
 
         self.data = data
-        self.features = data.features
-
         self.config = config
 
         self.start_date = pd.to_datetime(self.config.params.start_date, format='%Y-%m-%d').date()
@@ -284,7 +282,7 @@ class FinformerDataset(Dataset):
 
     def get_batch_values(self, ticker_index, date_index):
 
-        columns = self.features['value_features']
+        columns = self.config.features.value_features
         df_batch_values = self.data.prices.loc[pd.IndexSlice[ticker_index, date_index], columns]
 
         # [C + P, N]
@@ -310,7 +308,7 @@ class FinformerDataset(Dataset):
 
     def _get_batch_time_features(self, date_index):
 
-        columns = self.features['time_features']
+        columns = self.config.features.time_features
 
         df_batch_time_features = self.data.calendar.loc[date_index, columns]
 
@@ -327,7 +325,7 @@ class FinformerDataset(Dataset):
         batch_end = date_index.max().date()
 
         condition = (df_batch_dynamic_real_features['start_date'] <= batch_end) & (df_batch_dynamic_real_features['end_date'] >= batch_start)
-        columns = self.features['dynamic_real_features']
+        columns = self.config.features.dynamic_real_features
 
         df_batch_dynamic_real_features = df_batch_dynamic_real_features.loc[condition, columns]
 
@@ -344,7 +342,7 @@ class FinformerDataset(Dataset):
 
     def get_static_categorical_features(self, ticker_index):
 
-        columns = self.features['static_categorical_features']
+        columns = self.config.features.static_categorical_features
         df_static_categorical_features = self.data.profile.loc[ticker_index, columns]
 
         # [N, ]
@@ -354,7 +352,7 @@ class FinformerDataset(Dataset):
 
     def get_static_real_features(self, ticker_index):
 
-        columns = self.features['static_real_features']
+        columns = self.config.features.static_real_features
         df_static_real_features = self.data.profile.loc[ticker_index, columns]
 
         # [N, ]
