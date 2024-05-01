@@ -125,8 +125,8 @@ class FinformerCollator:
 
     def _collate_batch_text(self, batch_text, date_ids):
 
-        keys = None
-        output = {key: list() for key in self.keys_text}
+        keys = self.keys_text
+        output = {key: list() for key in keys}
 
         # Convert array of dicts to dict of arrays
         for batch_item in batch_text:
@@ -168,8 +168,8 @@ class FinformerCollator:
     
     def _collate_batch_num(self, batch_num):
 
-        keys = None
-        output = {key: list() for key in self.keys_num}
+        keys = self.keys_num
+        output = {key: list() for key in keys}
 
         # Convert array of dicts to dict of arrays
         for batch_item in batch_num:

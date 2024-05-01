@@ -24,12 +24,10 @@ training_args:
   per_device_train_batch_size: 4
   per_device_eval_batch_size: 4
   num_train_epochs: 5
-  learning_rate: 3e-4
-  weight_decay: 1e-2
+  learning_rate: 0.0003
+  weight_decay: 0.01
   log_level: debug
   logging_steps: 50
-  load_best_model_at_end: true
-  push_to_hub: true
 sentiment_model:
   model:
     _target_: AutoModelForSequenceClassification
