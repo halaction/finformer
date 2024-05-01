@@ -254,7 +254,7 @@ class FinformerDataset(Dataset):
                 return_tensors='pt',
             )
 
-            date_ids = df_text['dates'].values.astype(int)
+            date_ids = df_text['date'].values.astype(int)
             date_ids = date_ids // self.timestamp_freq - self.start_date_int
             date_ids = torch.tensor(date_ids, dtype=torch.int64)
         
