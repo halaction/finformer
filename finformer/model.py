@@ -79,7 +79,7 @@ class TimeSeriesModel(nn.Module):
     def init_model(self, config):
 
         input_size = len(config.features.value_features) + config.sentiment_model.output_size
-        lags_sequence = list(range(1, config.time_series_model.max_lag + 1))
+        lags_sequence = list(range(1, self.config.params.max_lag + 1))
 
         num_time_features = len(config.features.time_features)
         num_dynamic_real_features = len(config.features.dynamic_real_features)
