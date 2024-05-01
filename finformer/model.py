@@ -42,22 +42,24 @@ class SentimentModel(nn.Module):
 
         sentiment_output = list()
 
-        for batch_text_split in batch_text_splits:
+        if len(batch_text_splits) > 0:  
 
-            with torch.no_grad():
-                _sentiment_output = self.model(**batch_text_split).logits
-                sentiment_output.append(_sentiment_output)
+            for batch_text_split in batch_text_splits:
 
-        sentiment_output = torch.cat(sentiment_output, dim=0)
-        sentiment_output_splits = sentiment_output.split(lengths, dim=0)
+                with torch.no_grad():
+                    _sentiment_output = self.model(**batch_text_split).logits
+                    sentiment_output.append(_sentiment_output)
 
-        date_ids_splits = date_ids.split(lengths, dim=0)
+            sentiment_output = torch.cat(sentiment_output, dim=0)
+            sentiment_output_splits = sentiment_output.split(lengths, dim=0)
 
-        # TODO: Map into 1d and use one index_add_
+            date_ids_splits = date_ids.split(lengths, dim=0)
 
-        for i in range(len(lengths)):
-            if lengths[i] > 0:
-                batch_sentiment[i, :, :].index_add_(dim=0, index=date_ids_splits[i], source=sentiment_output_splits[i])
+            # TODO: Map into 1d and use one index_add_
+
+            for i in range(len(lengths)):
+                if lengths[i] > 0:
+                    batch_sentiment[i, :, :].index_add_(dim=0, index=date_ids_splits[i], source=sentiment_output_splits[i])
 
         # Future mask for news
         batch_sentiment[:, self.sequence_length:, :].fill_(float('nan'))

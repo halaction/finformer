@@ -77,6 +77,19 @@ class FinformerCollator:
         self.config = config
         self.device = get_device()
 
+        self.keys_text = [
+            'input_ids',
+            'token_type_ids',
+            'attention_mask',
+        ]
+
+        self.keys_num = [
+            'batch_values', 
+            'batch_time_features', 
+            'static_categorical_features', 
+            'static_real_features',
+        ]
+
     @staticmethod
     def right_zero_pad(tensor, max_length, dim=-1):
         
@@ -94,14 +107,11 @@ class FinformerCollator:
     def _collate_batch_text(self, batch_text, date_ids):
 
         keys = None
+        output = {key: list() for key in self.keys_text}
 
         # Convert array of dicts to dict of arrays
         for batch_item in batch_text:
             if batch_item is not None:
-                if keys is None:
-                    keys = batch_item.keys()
-                    output = {key: list() for key in keys}
-
                 for key in keys:
                     value = batch_item[key]
                     output[key].append(value)
@@ -110,16 +120,20 @@ class FinformerCollator:
 
         batch_text_splits = list()
 
+        # TODO: Handle empty batch_text_splits
+
         # Pad and concatenate tensors inside dict
         for key, values in output.items():
+            values_splits = list()
 
-            lengths = [value.size(1) for value in values]
-            max_length = max(lengths)
-                
-            values = [self.right_zero_pad(value, max_length, dim=1) for value in values]
+            if len(values) > 0:
+                lengths = [value.size(1) for value in values]
+                max_length = max(lengths)
+                    
+                values = [self.right_zero_pad(value, max_length, dim=1) for value in values]
 
-            values_cat = torch.cat(values, dim=0).to(self.device)
-            values_splits = values_cat.split(self.config.sentiment_model.max_batch_size, dim=0)
+                values_cat = torch.cat(values, dim=0)
+                values_splits = values_cat.split(self.config.sentiment_model.max_batch_size, dim=0)
 
             batch_text_splits.append(values_splits)
 
@@ -129,28 +143,25 @@ class FinformerCollator:
         ))
 
         date_ids = filter_none(date_ids)
-        date_ids = torch.cat(date_ids, dim=0).to(self.device)
+        date_ids = torch.cat(date_ids, dim=0)
 
         return batch_text_splits, date_ids
     
     def _collate_batch_num(self, batch_num):
 
         keys = None
+        output = {key: list() for key in self.keys_num}
 
         # Convert array of dicts to dict of arrays
         for batch_item in batch_num:
             if batch_item is not None:
-                if keys is None:
-                    keys = batch_item.keys()
-                    output = {key: list() for key in keys}
-
                 for key in keys:
                     value = batch_item[key]
                     output[key].append(value)
 
         # Concatenate tensors in dict
         for key, values in output.items():
-            output[key] = torch.cat(values, dim=0).to(self.device)
+            output[key] = torch.cat(values, dim=0)
 
         return output
 
