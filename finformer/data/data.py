@@ -6,8 +6,6 @@ import pandas as pd
 from huggingface_hub import login, hf_hub_download
 from sklearn.preprocessing import LabelEncoder
 
-from finformer.utils import FinformerConfig, FinformerBatch, snake_case
-
 
 class FinformerData:
 

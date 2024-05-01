@@ -4,8 +4,6 @@ import torch.nn as nn
 from transformers import AutoModelForSequenceClassification
 from transformers import TimeSeriesTransformerConfig, TimeSeriesTransformerForPrediction
 
-from finformer.data.dataset import get_dataloader
-
 
 class SentimentModel(nn.Module):
 
