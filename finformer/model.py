@@ -8,6 +8,8 @@ from transformers import TimeSeriesTransformerConfig, TimeSeriesTransformerForPr
 class SentimentModel(nn.Module):
 
     def __init__(self, config):
+
+        super().__init__()
         
         self.config = config
         self.model = self.init_model(config)
@@ -62,6 +64,8 @@ class SentimentModel(nn.Module):
 class TimeSeriesModel(nn.Module):
 
     def __init__(self, config):
+
+        super().__init__()
 
         self.config = config
         self.model = self.init_model(config)
@@ -156,6 +160,7 @@ class FinformerModel(nn.Module):
         self,
         config
     ):
+        super().__init__()
         
         self.config = config
 
