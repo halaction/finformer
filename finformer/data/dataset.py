@@ -118,16 +118,7 @@ class FinformerCollator:
         batch_text_splits, date_ids = self._collate_batch_text(batch_text, date_ids)
         batch_num = self._collate_batch_num(batch_num)
 
-        collated_batch = FinformerBatch(
-            batch_text_splits=batch_text_splits,
-            date_ids=date_ids,
-            batch_num=batch_num,
-            tickers=tickers,
-            date_offsets=date_offsets,
-            lengths=lengths,
-        )
-
-        return collated_batch
+        return batch_text_splits, batch_num, tickers, date_offsets, date_ids, lengths
 
     def __call__(self, batch):
         return self.collate_fn(batch)

@@ -4,6 +4,8 @@ import torch.nn as nn
 from transformers import AutoModelForSequenceClassification
 from transformers import TimeSeriesTransformerConfig, TimeSeriesTransformerForPrediction
 
+from finformer.utils import FinformerBatch
+
 
 class SentimentModel(nn.Module):
 
@@ -169,7 +171,18 @@ class FinformerModel(nn.Module):
         self.sentiment_model = SentimentModel(config)
         self.time_series_model = TimeSeriesModel(config)
 
-    def forward(self, batch):
+    def forward(self, *inputs):
+
+        batch_text_splits, batch_num, tickers, date_offsets, date_ids, lengths = inputs
+
+        batch = FinformerBatch(
+            batch_text_splits=batch_text_splits,
+            date_ids=date_ids,
+            batch_num=batch_num,
+            tickers=tickers,
+            date_offsets=date_offsets,
+            lengths=lengths,
+        )
         
         batch_sentiment = self.sentiment_model(batch)
         batch.batch_sentiment = batch_sentiment
