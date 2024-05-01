@@ -11,6 +11,49 @@ from finformer.data.data import FinformerData
 from finformer.utils import FinformerConfig, FinformerBatch, filter_none, get_device
 
 
+def get_split_dataset(config, data=None, test_size=0.2, val_size=0.1):
+
+    if data is None:
+        data = FinformerData(config)
+
+    index_train, index_val, index_test = split_index(data._index, test_size=test_size, val_size=val_size)
+
+    dataset_train = FinformerDataset(config, data=data, index=index_train)
+    dataset_val = FinformerDataset(config, data=data, index=index_val)
+    dataset_test = FinformerDataset(config, data=data, index=index_test)
+
+    return dataset_train, dataset_val, dataset_test
+
+
+def split_index(index, test_size=0.2, val_size=0.1, random_state=0):
+    
+    index_set = set(index)
+
+    index_set_test = set(
+        pd.DataFrame(index_set, columns=['ticker', 'date_offset'])
+        .groupby(by='ticker')
+        .sample(frac=test_size, random_state=random_state)
+        .itertuples(index=False, name=None)
+    )
+
+    index_set_train = index_set - index_set_test
+
+    index_set_val = set(
+        pd.DataFrame(index_set_train, columns=['ticker', 'date_offset'])
+        .groupby(by='ticker')
+        .sample(frac=val_size, random_state=random_state)
+        .itertuples(index=False, name=None)
+    )
+
+    index_set_train = index_set_train - index_set_val
+
+    index_train = sorted(list(index_set_train))
+    index_val = sorted(list(index_set_val))
+    index_test = sorted(list(index_set_test))
+
+    return index_train, index_val, index_test
+
+
 def get_dataloader(config, dataset=None):
 
     collate_fn = FinformerCollator(config)
@@ -135,10 +178,11 @@ class FinformerCollator:
 
 class FinformerDataset(Dataset):
 
-    def __init__(self, config: FinformerConfig, data: FinformerData = None):
+    def __init__(self, config: FinformerConfig, data: FinformerData = None, index: List = None):
 
         self.config = config
 
+        # NOTE: Pass data explicitly to avoid copy
         if data is None:
             self.data = FinformerData(config)
         else:
@@ -159,32 +203,24 @@ class FinformerDataset(Dataset):
         self.timestamp_freq = int(24 * 60 * 60 * 1e9)
         self.start_date_int = self.batch_date_index.values.astype(int).min() // self.timestamp_freq
 
-        self._index = self._get_index()
+        if index is None:
+            self.index = self._get_index()
+        else:
+            self.index = index
 
         self.tokenizer = self._get_tokenizer()
 
     def _get_tokenizer(self):
-
-        tokenizer = AutoTokenizer.from_pretrained(self.config.sentiment_model.model.name)
-
-        return tokenizer
+        return self.data._tokenizer
 
     def _get_index(self):
-
-        ticker_index = self.data.tickers
-        
-        n_dates = (self.end_date - self.start_date).days - self.batch_length + 1 
-        date_offset_index = list(range(0, n_dates, self.batch_length))
-
-        _index = list(product(ticker_index, date_offset_index))
-
-        return _index
+        return self.data._index
 
     def __len__(self):
-        return len(self._index)
+        return len(self.index)
 
     def __getitem__(self, idx):
-        ticker, date_offset = self._index[idx]
+        ticker, date_offset = self.index[idx]
 
         ticker_index = ticker
         date_index = self.batch_date_index + pd.to_timedelta(date_offset, unit='D')

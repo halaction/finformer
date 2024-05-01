@@ -2,9 +2,12 @@ import os
 from tqdm.auto import tqdm
 from dotenv import load_dotenv
 import pandas as pd
+from itertools import product
 
 from huggingface_hub import login, hf_hub_download
 from sklearn.preprocessing import LabelEncoder
+
+from transformers import AutoTokenizer
 
 
 class FinformerData:
@@ -16,6 +19,10 @@ class FinformerData:
         self.start_date = pd.to_datetime(self.config.params.start_date, format='%Y-%m-%d').date()
         self.end_date = pd.to_datetime(self.config.params.end_date, format='%Y-%m-%d').date()
         self.date_index = pd.date_range(start=self.start_date, end=self.end_date, freq='D')
+
+        self.sequence_length = self.config.params.context_length + self.config.params.max_lag
+        self.prediction_length = self.config.params.prediction_length
+        self.batch_length = self.sequence_length + self.prediction_length
 
         self.keys = ['tickers', 'changes', 'profile', 'metrics', 'prices', 'news', 'calendar']
 
@@ -33,6 +40,27 @@ class FinformerData:
         self.save(force=force)
 
         self.label_encoders = self._get_label_encoders()
+
+        # NOTE: Used to avoid copy in child datasets
+        self._tokenizer = self._get_tokenizer()
+        self._index = self._get_index()
+
+    def _get_tokenizer(self):
+
+        tokenizer = AutoTokenizer.from_pretrained(self.config.sentiment_model.model.name)
+
+        return tokenizer
+
+    def _get_index(self):
+
+        ticker_index = self.tickers
+        
+        n_dates = (self.end_date - self.start_date).days - self.batch_length + 1 
+        date_offset_index = list(range(0, n_dates, self.batch_length))
+
+        index = list(product(ticker_index, date_offset_index))
+
+        return index
 
     def load(self, force=False):
 
