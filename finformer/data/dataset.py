@@ -229,8 +229,11 @@ class FinformerDataset(Dataset):
         batch_start = date_index.min().date()
         batch_end = date_index.max().date()
 
-        columns = ['title', 'text']
-        df_text = self.data.news.loc[pd.IndexSlice[ticker_index, batch_start:batch_end], columns]
+        df_text = self.data.news.loc[pd.IndexSlice[ticker_index, batch_start:batch_end], :].reset_index(drop=True)
+        
+        # For each day sample news not more than specified amount
+        # Source: https://stackoverflow.com/a/67871511
+        df_text = df_text.sample(frac=1).groupby(by='date').head(self.config.params.max_news_daily)
 
         text = df_text['title'].tolist()
         text_pair = df_text['text'].tolist()
@@ -251,7 +254,7 @@ class FinformerDataset(Dataset):
                 return_tensors='pt',
             )
 
-            date_ids = df_text.index.get_level_values('timestamp').floor(freq='D').values.astype(int)
+            date_ids = df_text['dates'].values.astype(int)
             date_ids = date_ids // self.timestamp_freq - self.start_date_int
             date_ids = torch.tensor(date_ids, dtype=torch.int64)
         

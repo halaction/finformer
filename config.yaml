@@ -13,6 +13,59 @@ params:
   max_lag: 1
   start_date: '2020-01-01'
   end_date: '2024-04-15'
+  min_news: 300
+  max_news_daily: 10
+  min_trading_days: 365
+sentiment_model:
+  pretrained_model_name: ProsusAI/finbert
+  max_batch_size: 16
+  max_length: 128
+time_series_model: 
+  name: null
+  max_batch_size: 16
+hf:
+  dataset_dir: raw-dataset
+  repo_id: halaction/finformer-data
+fmp:
+  metrics:
+    dir: ./data/fmp/metrics
+    separate: true
+    endpoint: v3/key-metrics
+    path_params:
+      symbol: null
+    query_params:
+      apikey: null
+      limit: null
+      period: null
+  news:
+    dir: ./data/fmp/news
+    separate: true
+    endpoint: v3/stock_news
+    path_params: null
+    query_params:
+      apikey: null
+      limit: null
+      page: null
+      tickers: null
+  prices:
+    dir: ./data/fmp/prices
+    separate: true
+    endpoint: v3/historical-price-full
+    path_params:
+      symbol: null
+    query_params:
+      apikey: null
+      from: null
+      serietype: null
+      to: null
+  profile:
+    dir: ./data/fmp/profile
+    separate: false
+    endpoint: v3/profile
+    path_params:
+      symbol: null
+    query_params:
+      apikey: null
 features:
   dynamic_real_features:
   - revenuePerShare
@@ -73,54 +126,3 @@ features:
   - low
   - high
   - volume
-sentiment_model:
-  pretrained_model_name: ProsusAI/finbert
-  max_batch_size: 16
-  max_length: 128
-time_series_model: 
-  name: null
-  max_batch_size: 16
-hf:
-  dataset_dir: raw-dataset
-  repo_id: halaction/finformer-data
-fmp:
-  metrics:
-    dir: ./data/fmp/metrics
-    separate: true
-    endpoint: v3/key-metrics
-    path_params:
-      symbol: null
-    query_params:
-      apikey: null
-      limit: null
-      period: null
-  news:
-    dir: ./data/fmp/news
-    separate: true
-    endpoint: v3/stock_news
-    path_params: null
-    query_params:
-      apikey: null
-      limit: null
-      page: null
-      tickers: null
-  prices:
-    dir: ./data/fmp/prices
-    separate: true
-    endpoint: v3/historical-price-full
-    path_params:
-      symbol: null
-    query_params:
-      apikey: null
-      from: null
-      serietype: null
-      to: null
-  profile:
-    dir: ./data/fmp/profile
-    separate: false
-    endpoint: v3/profile
-    path_params:
-      symbol: null
-    query_params:
-      apikey: null
-

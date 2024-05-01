@@ -58,6 +58,28 @@ class FinformerData:
 
             setattr(self, key, df)
 
+        self.filter_data()
+
+    def filter_data(self):
+
+        news_count = self.news['title'].groupby(level='ticker').count()
+        prices_count = self.prices['close'].groupby(level='ticker').count()
+
+        index_news = news_count[news_count >= self.config.params.min_news].index
+        index_prices = prices_count[prices_count >= self.config.params.min_trading_days].index
+
+        valid_tickers = index_news.intersection(index_prices)
+
+        self.tickers = pd.Series(valid_tickers)
+        self.profile = self.profile.loc[self.tickers, :]
+        self.metrics = self.metrics.loc[pd.IndexSlice[valid_tickers, :], :]
+        self.prices = self.prices.loc[pd.IndexSlice[valid_tickers, :], :]
+        self.news = self.news.loc[pd.IndexSlice[valid_tickers, :], :]
+
+        #for key in self.keys:
+        #    df = getattr(self, key)
+        #    if 'ticker' in df.index.names:
+
     def save(self, force=False):
 
         progress_bar = tqdm(self.keys)
