@@ -11,12 +11,21 @@ from finformer.data.data import FinformerData
 from finformer.utils import FinformerConfig, FinformerBatch, filter_none, get_device
 
 
-def get_split_dataset(config, data=None, test_size=0.2, val_size=0.1):
+def get_split_dataset(config, data=None):
+
+    train_size = config.params.train_size
+    val_size = config.params.val_size
+    test_size = config.params.test_size
 
     if data is None:
         data = FinformerData(config)
 
-    index_train, index_val, index_test = split_index(data._index, test_size=test_size, val_size=val_size)
+    index_train, index_val, index_test = split_index(
+        data._index, 
+        train_size=train_size,
+        val_size=val_size,
+        test_size=test_size, 
+    )
 
     dataset_train = FinformerDataset(config, data=data, index=index_train)
     dataset_val = FinformerDataset(config, data=data, index=index_val)
@@ -25,7 +34,7 @@ def get_split_dataset(config, data=None, test_size=0.2, val_size=0.1):
     return dataset_train, dataset_val, dataset_test
 
 
-def split_index(index, test_size=0.2, val_size=0.1, random_state=0):
+def split_index(index, train_size=0.7, val_size=0.1, test_size=0.2, random_state=0):
     
     index_set = set(index)
 
@@ -36,16 +45,26 @@ def split_index(index, test_size=0.2, val_size=0.1, random_state=0):
         .itertuples(index=False, name=None)
     )
 
-    index_set_train = index_set - index_set_test
+    index_set = index_set - index_set_test
 
     index_set_val = set(
-        pd.DataFrame(index_set_train, columns=['ticker', 'date_offset'])
+        pd.DataFrame(index_set, columns=['ticker', 'date_offset'])
         .groupby(by='ticker')
-        .sample(frac=val_size, random_state=random_state)
+        .sample(frac=val_size / (1 - test_size), random_state=random_state)
         .itertuples(index=False, name=None)
     )
 
-    index_set_train = index_set_train - index_set_val
+    index_set = index_set - index_set_val
+
+    if train_size + val_size + test_size == 1:
+        index_set_train = index_set
+    else:
+        index_set_train = set(
+            pd.DataFrame(index_set, columns=['ticker', 'date_offset'])
+            .groupby(by='ticker')
+            .sample(frac=train_size / (1 - test_size - val_size), random_state=random_state)
+            .itertuples(index=False, name=None)
+        )
 
     index_train = sorted(list(index_set_train))
     index_val = sorted(list(index_set_val))

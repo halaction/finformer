@@ -8,6 +8,9 @@ dirs:
   dataset_dir: ./data/dataset
 params:
   batch_size: 4
+  train_size: 0.1
+  val_size: 0.1
+  test_size: 0.1
   context_length: 30
   prediction_length: 15
   max_lag: 1
@@ -16,6 +19,17 @@ params:
   min_news: 300
   max_news_daily: 5
   min_trading_days: 365
+training_args:
+  output_dir: trainer
+  per_device_train_batch_size: 4
+  per_device_eval_batch_size: 4
+  num_train_epochs: 5
+  learning_rate: 3e-4
+  weight_decay: 1e-2
+  log_level: debug
+  logging_steps: 50
+  load_best_model_at_end: true
+  push_to_hub: true
 sentiment_model:
   model:
     _target_: AutoModelForSequenceClassification
