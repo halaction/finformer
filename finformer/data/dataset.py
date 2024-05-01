@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer
 
-from finformer.data import FinformerData
+from finformer.data.data import FinformerData
 from finformer.utils import FinformerConfig, FinformerBatch, filter_none, get_device
 
 
