@@ -171,17 +171,10 @@ class FinformerModel(nn.Module):
         self.sentiment_model = SentimentModel(config)
         self.time_series_model = TimeSeriesModel(config)
 
-    def forward(self, *inputs):
-
-        batch_text_splits, batch_num, tickers, date_offsets, date_ids, lengths = inputs
+    def forward(self, **inputs):
 
         batch = FinformerBatch(
-            batch_text_splits=batch_text_splits,
-            date_ids=date_ids,
-            batch_num=batch_num,
-            tickers=tickers,
-            date_offsets=date_offsets,
-            lengths=lengths,
+            **inputs
         )
         
         batch_sentiment = self.sentiment_model(batch)
