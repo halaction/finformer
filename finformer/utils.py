@@ -111,7 +111,7 @@ class FinformerConfig(DotDict):
         super().__init__(cfg)
 
     def __repr__(self):
-        return json.dumps(self._cfg, indent=2)
+        return json.dumps(self, indent=2)
 
 
 class FinformerBatch(DotDict):
