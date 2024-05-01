@@ -164,7 +164,7 @@ class FinformerModel(nn.Module):
     ):
         super().__init__()
         
-        self.config = config
+        self._config = config
 
         self.sentiment_model = SentimentModel(config)
         self.time_series_model = TimeSeriesModel(config)
