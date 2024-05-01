@@ -43,10 +43,10 @@ class FinformerTrainer(Trainer):
 
         self._config = config
 
-        model = FinformerModel(config)
+        dataset_train, dataset_val, dataset_test = get_split_dataset(config)
         data_collator = FinformerCollator(config)
 
-        dataset_train, dataset_val, dataset_test = get_split_dataset(config)
+        model = FinformerModel(config)
 
         training_args = TrainingArguments(**config.training_args)
 
@@ -57,7 +57,7 @@ class FinformerTrainer(Trainer):
             train_dataset=dataset_train,
             eval_dataset=dataset_val,
             data_collator=data_collator,
-            #compute_metrics=compute_metrics
+            compute_metrics=compute_metrics,
         )
 
         
