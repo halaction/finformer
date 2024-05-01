@@ -31,7 +31,7 @@ class SentimentModel(nn.Module):
     def forward(self, batch):
 
         batch_text_splits = batch.pop('batch_text_splits')
-        date_ids_splits = batch.pop('date_ids_splits')
+        date_ids = batch.pop('date_ids')
 
         lengths = batch.pop('lengths')
 
@@ -48,6 +48,8 @@ class SentimentModel(nn.Module):
 
         sentiment_output = torch.cat(sentiment_output, dim=0)
         sentiment_output_splits = sentiment_output.split(lengths, dim=0)
+
+        date_ids_splits = date_ids.split(lengths, dim=0)
 
         # TODO: Map into 1d and use one index_add_
 

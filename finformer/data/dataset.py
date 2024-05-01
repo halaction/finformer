@@ -86,11 +86,9 @@ class FinformerCollator:
         ))
 
         date_ids = filter_none(date_ids)
+        date_ids = torch.cat(date_ids, dim=0).to(self.device)
 
-        date_ids_cat = torch.cat(date_ids, dim=0).to(self.device)
-        date_ids_splits = date_ids_cat.split(self.config.sentiment_model.max_batch_size, dim=0)
-
-        return batch_text_splits, date_ids_splits
+        return batch_text_splits, date_ids
     
     def _collate_batch_num(self, batch_num):
 
@@ -117,12 +115,12 @@ class FinformerCollator:
 
         batch_text, batch_num, tickers, date_offsets, date_ids, lengths = zip(*batch)
 
-        batch_text_splits, date_ids_splits = self._collate_batch_text(batch_text, date_ids)
+        batch_text_splits, date_ids = self._collate_batch_text(batch_text, date_ids)
         batch_num = self._collate_batch_num(batch_num)
 
         collated_batch = FinformerBatch(
             batch_text_splits=batch_text_splits,
-            date_ids_splits=date_ids_splits,
+            date_ids=date_ids,
             batch_num=batch_num,
             tickers=tickers,
             date_offsets=date_offsets,
