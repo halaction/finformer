@@ -311,7 +311,7 @@ class FinformerData:
         })
 
         df['timestamp'] = pd.to_datetime(df['timestamp'], format='%Y-%m-%d %H:%M:%S')
-        df['date'] = df['timestamp'].dt.date
+        df['date'] = df['timestamp'].dt.floor(freq='D')
 
         condition_date = (df['date'] >= self.start_date) & (df['date'] <= self.end_date)
         df = df.loc[condition_date, :]
