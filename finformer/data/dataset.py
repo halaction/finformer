@@ -167,7 +167,7 @@ class FinformerDataset(Dataset):
 
     def _get_tokenizer(self):
 
-        tokenizer = AutoTokenizer.from_pretrained(self.config.sentiment_model.pretrained_model_name)
+        tokenizer = AutoTokenizer.from_pretrained(self.config.sentiment_model.model.name)
 
         return tokenizer
 
