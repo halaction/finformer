@@ -8,6 +8,8 @@ import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
+import torch
+
 
 def adaptive_get(url):
 
@@ -43,6 +45,31 @@ def snake_case(string: str):
     return string
 
 
+def get_device():
+
+    device_name = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = torch.device(device_name)
+
+    return device
+
+
+class DotDict(dict):
+    """
+    A dictionary that supports dot access notation
+    """
+
+    __getattr__ = dict.__getitem__
+    __setattr__ = dict.__setitem__
+    __delattr__ = dict.__delitem__
+
+    def __init__(self, dct):
+
+        for key, value in dct.items():
+            if isinstance(value, dict):
+                value = DotDict(value)
+            setattr(self, key, value)
+
+
 class BaseConfig:
 
     def __init__(self, cfg):
@@ -72,7 +99,7 @@ class BaseConfig:
         return json.dumps(self._cfg, indent=2)
 
 
-class FinformerConfig(BaseConfig):
+class FinformerConfig(DotDict):
 
     def __init__(self, cfg: Dict = None):
 
@@ -82,3 +109,24 @@ class FinformerConfig(BaseConfig):
                 cfg = yaml.safe_load(file)
 
         super().__init__(cfg)
+
+    def __repr__(self):
+        return json.dumps(self._cfg, indent=2)
+
+
+class FinformerBatch(DotDict):
+
+    def __init__(
+        self, 
+        **kwargs,
+    ):
+        
+        batch = dict()
+        for key, value in kwargs.items():
+            batch[key] = value
+
+        super().__init__(batch)
+
+        
+
+        

@@ -6,13 +6,7 @@ import pandas as pd
 from huggingface_hub import login, hf_hub_download
 from sklearn.preprocessing import LabelEncoder
 
-from finformer.utils import FinformerConfig, snake_case
-
-
-config = FinformerConfig()
-
-DATA_DIR = config.dirs.data_dir
-SOURCE_DIR = config.dirs.source_dir
+from finformer.utils import FinformerConfig, FinformerBatch, snake_case
 
 
 class FinformerData:
@@ -171,6 +165,11 @@ class FinformerData:
 
         for column, encoder in label_encoders.items():
             self.profile[column] = encoder.fit_transform(self.profile[column])
+
+        self.config.cardinality = [
+            len(label_encoders[column].classes_) 
+            for column in columns
+        ]
 
         return label_encoders
 

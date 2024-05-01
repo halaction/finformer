@@ -14,15 +14,22 @@ params:
   start_date: '2020-01-01'
   end_date: '2024-04-15'
   min_news: 300
-  max_news_daily: 10
+  max_news_daily: 5
   min_trading_days: 365
 sentiment_model:
-  pretrained_model_name: ProsusAI/finbert
+  model:
+    _target_: AutoModelForSequenceClassification
+    name: ProsusAI/finbert
+    pretrained: true
+  output_size: 3
   max_batch_size: 16
   max_length: 128
 time_series_model: 
-  name: null
+  model:
+    _target_: TimeSeriesTransformerModel
+    name: null
   max_batch_size: 16
+  embedding_dimension: 16
 hf:
   dataset_dir: raw-dataset
   repo_id: halaction/finformer-data
@@ -126,3 +133,4 @@ features:
   - low
   - high
   - volume
+cardinality: null

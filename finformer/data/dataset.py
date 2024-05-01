@@ -7,18 +7,16 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer
 
-from finformer.utils import FinformerConfig, filter_none
+from finformer.data import FinformerData
+from finformer.utils import FinformerConfig, FinformerBatch, filter_none, get_device
 
 
-config = FinformerConfig()
-
-DATA_DIR = config.dirs.data_dir
-SOURCE_DIR = config.dirs.source_dir
-
-
-def get_dataloader(config, dataset):
+def get_dataloader(config, dataset=None):
 
     collate_fn = FinformerCollator(config)
+    
+    if dataset is None:
+        dataset = FinformerDataset(config)
 
     dataloader = DataLoader(
         dataset=dataset, 
@@ -30,31 +28,11 @@ def get_dataloader(config, dataset):
     return dataloader
 
 
-class FinformerBatch:
-
-    def __init__(
-        self, 
-        batch_text: Dict,
-        batch_num: Dict,
-        tickers: List,
-        date_offsets: List,
-        date_ids: List,
-        lengths: List,
-    ):
-        
-        self.batch_text = batch_text
-        self.batch_num = batch_num
-
-        self.tickers = tickers
-        self.date_offsets = date_offsets
-        self.date_ids = date_ids
-        self.lengths = lengths
-
-
 class FinformerCollator:
 
     def __init__(self, config):
         self.config = config
+        self.device = get_device()
 
     @staticmethod
     def right_zero_pad(tensor, max_length, dim=-1):
@@ -87,7 +65,7 @@ class FinformerCollator:
 
                 # TODO: Avoid copies and delete input batch
 
-        output_values = list()
+        batch_text_splits = list()
 
         # Pad and concatenate tensors inside dict
         for key, values in output.items():
@@ -97,19 +75,22 @@ class FinformerCollator:
                 
             values = [self.right_zero_pad(value, max_length, dim=1) for value in values]
 
-            values_split = torch.cat(values, dim=0).split(self.config.sentiment_model.max_batch_size, dim=0)
+            values_cat = torch.cat(values, dim=0).to(self.device)
+            values_splits = values_cat.split(self.config.sentiment_model.max_batch_size, dim=0)
 
-            output_values.append(values_split)
+            batch_text_splits.append(values_splits)
 
-        batch_text = list(map(
+        batch_text_splits = list(map(
             lambda output_split: dict(zip(keys, output_split)), 
-            zip(*output_values)
+            zip(*batch_text_splits)
         ))
 
         date_ids = filter_none(date_ids)
-        date_ids = torch.cat(date_ids, dim=0).split(self.config.sentiment_model.max_batch_size, dim=0)
 
-        return batch_text, date_ids
+        date_ids_cat = torch.cat(date_ids, dim=0).to(self.device)
+        date_ids_splits = date_ids_cat.split(self.config.sentiment_model.max_batch_size, dim=0)
+
+        return batch_text_splits, date_ids_splits
     
     def _collate_batch_num(self, batch_num):
 
@@ -128,7 +109,7 @@ class FinformerCollator:
 
         # Concatenate tensors in dict
         for key, values in output.items():
-            output[key] = torch.cat(values, dim=0)
+            output[key] = torch.cat(values, dim=0).to(self.device)
 
         return output
 
@@ -136,16 +117,15 @@ class FinformerCollator:
 
         batch_text, batch_num, tickers, date_offsets, date_ids, lengths = zip(*batch)
 
-        batch_text, date_ids = self._collate_batch_text(batch_text, date_ids)
-
+        batch_text_splits, date_ids_splits = self._collate_batch_text(batch_text, date_ids)
         batch_num = self._collate_batch_num(batch_num)
 
         collated_batch = FinformerBatch(
-            batch_text=batch_text,
+            batch_text_splits=batch_text_splits,
+            date_ids_splits=date_ids_splits,
             batch_num=batch_num,
             tickers=tickers,
             date_offsets=date_offsets,
-            date_ids=date_ids,
             lengths=lengths,
         )
 
@@ -157,10 +137,14 @@ class FinformerCollator:
 
 class FinformerDataset(Dataset):
 
-    def __init__(self, data, config):
+    def __init__(self, config: FinformerConfig, data: FinformerData = None):
 
-        self.data = data
         self.config = config
+
+        if data is None:
+            self.data = FinformerData(config)
+        else:
+            self.data = data
 
         self.start_date = pd.to_datetime(self.config.params.start_date, format='%Y-%m-%d').date()
         self.end_date = pd.to_datetime(self.config.params.end_date, format='%Y-%m-%d').date()
@@ -256,7 +240,7 @@ class FinformerDataset(Dataset):
 
             date_ids = df_text['date'].values.astype(int)
             date_ids = date_ids // self.timestamp_freq - self.start_date_int
-            date_ids = torch.tensor(date_ids, dtype=torch.int64)
+            date_ids = torch.tensor(date_ids, dtype=torch.int32)
         
         return batch_encoding, date_ids, length
     
@@ -283,7 +267,7 @@ class FinformerDataset(Dataset):
         df_batch_values = self.data.prices.loc[pd.IndexSlice[ticker_index, date_index], columns]
 
         # [C + P, N]
-        batch_values = torch.tensor(df_batch_values.values, dtype=torch.float64)
+        batch_values = torch.tensor(df_batch_values.values, dtype=torch.float32)
 
         return batch_values
 
@@ -310,7 +294,7 @@ class FinformerDataset(Dataset):
         df_batch_time_features = self.data.calendar.loc[date_index, columns]
 
         # [C + P, N]
-        batch_time_features = torch.tensor(df_batch_time_features.values.astype('float'), dtype=torch.float64)
+        batch_time_features = torch.tensor(df_batch_time_features.values.astype('float'), dtype=torch.float32)
 
         return batch_time_features
 
@@ -333,7 +317,7 @@ class FinformerDataset(Dataset):
         )
 
         # [C + P, N]
-        batch_dynamic_real_features = torch.tensor(df_batch_dynamic_real_features.values, dtype=torch.float64)
+        batch_dynamic_real_features = torch.tensor(df_batch_dynamic_real_features.values, dtype=torch.float32)
 
         return batch_dynamic_real_features
 
@@ -343,7 +327,7 @@ class FinformerDataset(Dataset):
         df_static_categorical_features = self.data.profile.loc[ticker_index, columns]
 
         # [N, ]
-        static_categorical_features = torch.tensor(df_static_categorical_features.values.astype('int'), dtype=torch.int64)
+        static_categorical_features = torch.tensor(df_static_categorical_features.values.astype('int'), dtype=torch.int32)
 
         return static_categorical_features
 
@@ -353,7 +337,7 @@ class FinformerDataset(Dataset):
         df_static_real_features = self.data.profile.loc[ticker_index, columns]
 
         # [N, ]
-        static_real_features = torch.tensor(df_static_real_features.values.astype('float'), dtype=torch.float64)
+        static_real_features = torch.tensor(df_static_real_features.values.astype('float'), dtype=torch.float32)
 
         return static_real_features
     
