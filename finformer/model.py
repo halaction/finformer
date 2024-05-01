@@ -183,5 +183,8 @@ class FinformerModel(nn.Module):
         batch_output = self.time_series_model(batch)
 
         return batch_output
+    
+    def __call__(self, **inputs):
+        return self.forward(**inputs)
 
 
