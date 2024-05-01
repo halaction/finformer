@@ -51,6 +51,9 @@ class MetricsCallback(TrainerCallback):
 
     def on_log(self, args, state, control, **kwargs):
         return self._callback(args, state, control, **kwargs)
+    
+    def on_step_end(self, args, state, control, **kwargs):
+        return self._callback(args, state, control, **kwargs)
 
     def on_epoch_end(self, args, state, control, **kwargs):
         return self._callback(args, state, control, **kwargs)
