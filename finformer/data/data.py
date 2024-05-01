@@ -7,8 +7,6 @@ from itertools import product
 from huggingface_hub import login, hf_hub_download
 from sklearn.preprocessing import LabelEncoder
 
-from transformers import AutoTokenizer
-
 
 class FinformerData:
 
@@ -42,14 +40,7 @@ class FinformerData:
         self.label_encoders = self._get_label_encoders()
 
         # NOTE: Used to avoid copy in child datasets
-        self._tokenizer = self._get_tokenizer()
         self._index = self._get_index()
-
-    def _get_tokenizer(self):
-
-        tokenizer = AutoTokenizer.from_pretrained(self.config.sentiment_model.model.name)
-
-        return tokenizer
 
     def _get_index(self):
 

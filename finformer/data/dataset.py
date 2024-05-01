@@ -209,9 +209,12 @@ class FinformerDataset(Dataset):
             self.index = index
 
         self.tokenizer = self._get_tokenizer()
-
+    
     def _get_tokenizer(self):
-        return self.data._tokenizer
+
+        tokenizer = AutoTokenizer.from_pretrained(self.config.sentiment_model.model.name)
+
+        return tokenizer
 
     def _get_index(self):
         return self.data._index
