@@ -22,7 +22,7 @@ class SentimentModel(nn.Module):
 
     def init_model(self, config):
 
-        model = AutoModelForSequenceClassification.from_pretrained(config.sentiment_model.name)
+        model = AutoModelForSequenceClassification.from_pretrained(config.sentiment_model.model.name)
 
         return model
 
