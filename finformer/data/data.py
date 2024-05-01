@@ -260,7 +260,7 @@ class FinformerData:
         key = 'metrics'
         df = self._load_csv(key)
 
-        df.drop_duplicates(inplace=True)
+        df.drop_duplicates(subset=['symbol', 'date'], inplace=True)
 
         condition = df['symbol'].isin(self.tickers)
 
