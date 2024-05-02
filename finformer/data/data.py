@@ -403,7 +403,7 @@ class FinformerData:
         df.set_index(levels, inplace=True)
         df.sort_index(level=levels, ascending=True, inplace=True)
 
-        features = df.columns
+        features = df.columns.tolist()
         self.config.features.time_features = features
 
         return df
