@@ -168,7 +168,7 @@ class TimeSeriesModel(nn.Module):
 
         batch = self._prepare_batch(batch)
         
-        batch_output = self.time_series_model.generate(
+        batch_output = self.model.generate(
             past_values=batch["past_values"],
             past_time_features=batch["past_time_features"],
             past_observed_mask=batch["past_observed_mask"],
