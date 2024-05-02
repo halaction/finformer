@@ -164,10 +164,8 @@ class FinformerCollator:
         batch_offset = 0
         _date_ids = list()
 
-        date_ids = list(date_ids)
-
         for i in range(len(date_ids)):
-            date_id = date_ids.pop(i)
+            date_id = date_ids[i]
             if date_id is not None:
                 _date_ids.append(date_id + batch_offset)
                 batch_offset += date_id.size(0)
