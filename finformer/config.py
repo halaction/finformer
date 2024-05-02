@@ -6,7 +6,7 @@ from omegaconf import OmegaConf
 
 def get_config(overrides: List[str] = None):
 
-    with initialize(version_base=None, config_path='config', job_name='finformer'):
+    with initialize(version_base=None, config_path='configs', job_name='finformer'):
         config = compose(config_name='config', overrides=overrides)
 
     print(OmegaConf.to_yaml(config))
