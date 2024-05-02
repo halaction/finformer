@@ -97,8 +97,6 @@ class TimeSeriesModel(nn.Module):
         num_static_real_features = len(config.features.static_real_features)
 
         cardinality = config.time_series_model.cardinality
-        assert isinstance(cardinality, list)
-
         embedding_dimension = [config.time_series_model.embedding_dimension for _ in range(num_static_categorical_features)]
 
         model_config = TimeSeriesTransformerConfig(
