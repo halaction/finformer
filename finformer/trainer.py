@@ -12,9 +12,6 @@ mase_metric = load("evaluate-metric/mase")
 mape_metric = load("evaluate-metric/mape")
 smape_metric = load("evaluate-metric/smape")
 
-print(mase_metric)
-print(mase_metric.__dir__())
-
 metrics = [mase_metric, mape_metric, smape_metric]
 
 
@@ -39,7 +36,7 @@ def compute_metrics(eval_prediction):
 
 class MetricsCallback(TrainerCallback):
     
-    def __init__(self, trainer) -> None:
+    def __init__(self, trainer):
         super().__init__()
         self._trainer = trainer
 
