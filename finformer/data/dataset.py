@@ -93,7 +93,13 @@ def get_dataloader(config, dataset=None):
 class FinformerCollator:
 
     def __init__(self, config):
+
         self.config = config
+
+        self.sequence_length = self.config.params.context_length + self.config.params.max_lag
+        self.prediction_length = self.config.params.prediction_length
+        self.window_length = self.sequence_length + self.prediction_length
+
         self.device = get_device()
 
         self.keys_text = [
@@ -168,7 +174,7 @@ class FinformerCollator:
             date_id = date_ids[i]
             if date_id is not None:
                 _date_ids.append(date_id + batch_offset)
-                batch_offset += date_id.size(0)
+                batch_offset += self.window_length
 
         date_ids_cat = torch.cat(_date_ids, dim=0)
         date_ids_splits = date_ids_cat.split(self.config.sentiment_model.max_batch_size, dim=0)

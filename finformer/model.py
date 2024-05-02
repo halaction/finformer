@@ -22,8 +22,6 @@ class SentimentModel(nn.Module):
         self.window_length = self.sequence_length + self.prediction_length
         self.output_size = config.sentiment_model.output_size
 
-        #self.register_buffer('batch_output', torch.zeros(size=(self.batch_size, self.window_length, self.output_size)))
-
     def init_model(self, config):
         
         model = AutoModelForSequenceClassification.from_pretrained(config.sentiment_model.model.name)
