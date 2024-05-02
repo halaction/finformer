@@ -97,4 +97,9 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
 
         callback = MetricsCallback(self)
         self.add_callback(callback) 
+
+    def __prediction_step(self, *args):
+        # TODO: Rewrite this step
+        pass
+
         

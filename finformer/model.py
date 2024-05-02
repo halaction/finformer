@@ -214,9 +214,6 @@ class FinformerModel(nn.Module):
     
     def generate(self, **inputs):
 
-        if ('max_length' in inputs) or ('num_beams' in inputs):
-            print(inputs)
-
         batch = FinformerBatch(
             **inputs
         )
@@ -225,5 +222,9 @@ class FinformerModel(nn.Module):
         batch.batch_sentiment = batch_sentiment
 
         batch_output = self.time_series_model.generate(batch)
+
+        print(batch_output)
+        print(batch_output.sequences.size())
+        print(batch_output.sequences.median(dim=1).values[:4, :, :5])
 
         return batch_output
