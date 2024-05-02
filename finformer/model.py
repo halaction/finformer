@@ -178,6 +178,10 @@ class TimeSeriesModel(nn.Module):
         )
         
         return batch_output
+    
+
+class GenerationConfig:
+    _from_model_config = False
 
 
 class FinformerModel(nn.Module):
@@ -192,6 +196,8 @@ class FinformerModel(nn.Module):
 
         self.sentiment_model = SentimentModel(config)
         self.time_series_model = TimeSeriesModel(config)
+
+        self.generation_config = GenerationConfig()
 
     def forward(self, **inputs):
 
