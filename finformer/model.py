@@ -43,7 +43,8 @@ class SentimentModel(nn.Module):
         #batch_sentiment = self.batch_output
         #batch_sentiment.fill_(0)
 
-        batch_sentiment = torch.zeros(size=(self.batch_size * self.window_length, self.output_size))
+        # TODO: Move to params!!!
+        batch_sentiment = torch.zeros(size=(self.batch_size * self.window_length, self.output_size)).to(self.model.device)
 
         if len(batch_text_splits) > 0: 
             
