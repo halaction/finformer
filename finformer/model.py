@@ -31,7 +31,7 @@ class SentimentModel(nn.Module):
         if config.sentiment_model.output_type == 'logits':
             pass
         elif config.sentiment_model.output_type == 'features':
-            model.classifier = nn.Linear(768, config.sentiment_model.output_size)
+            model.classifier = nn.Linear(model.config.hidden_size, config.sentiment_model.output_size)
         else:
             raise ValueError(f'Unknown output_type `{config.sentiment_model.output_type}`.')
 
