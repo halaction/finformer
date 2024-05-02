@@ -1,0 +1,6 @@
+model:
+  name: mrm8488/distilroberta-finetuned-financial-news-sentiment-analysis
+output_size: 16
+output_type: features
+max_batch_size: 32
+max_length: 128

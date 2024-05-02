@@ -1,0 +1,5 @@
+model:
+  _target_: TimeSeriesTransformerModel
+  name: null
+embedding_dimension: 16
+cardinality: null

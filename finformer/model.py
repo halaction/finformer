@@ -22,45 +22,48 @@ class SentimentModel(nn.Module):
         self.window_length = self.sequence_length + self.prediction_length
         self.output_size = config.sentiment_model.output_size
 
-        self.register_buffer('batch_output', torch.zeros(size=(self.batch_size, self.window_length, self.output_size)))
+        #self.register_buffer('batch_output', torch.zeros(size=(self.batch_size, self.window_length, self.output_size)))
 
     def init_model(self, config):
-
+        
         model = AutoModelForSequenceClassification.from_pretrained(config.sentiment_model.model.name)
+
+        if config.sentiment_model.output_type == 'logits':
+            pass
+        elif config.sentiment_model.output_type == 'head':
+            model.classifier = nn.Linear(768, config.sentiment_model.output_size)
+        else:
+            raise ValueError(f'Unknown output_type `{config.sentiment_model.output_type}`.')
 
         return model
 
     def forward(self, batch):
 
         batch_text_splits = batch.pop('batch_text_splits')
-        date_ids = batch.pop('date_ids')
+        date_ids_splits = batch.pop('date_ids_splits')
 
-        lengths = batch.pop('lengths')
+        #batch_sentiment = self.batch_output
+        #batch_sentiment.fill_(0)
 
-        batch_sentiment = self.batch_output
-        batch_sentiment.fill_(0)
+        batch_sentiment = torch.zeros(size=(self.batch_size * self.window_length, self.output_size))
 
-        sentiment_output = list()
-
-        if len(batch_text_splits) > 0:  
-
-            for batch_text_split in batch_text_splits:
+        if len(batch_text_splits) > 0: 
+            
+            # TODO: Can this loop be automatized? 
+            for batch_text_split, date_ids_split in zip(batch_text_splits, date_ids_splits):
 
                 with torch.no_grad():
-                    _sentiment_output = self.model(**batch_text_split).logits
-                    sentiment_output.append(_sentiment_output)
+                    # [B, L] -> [B, D]
+                    sentiment_output_split = self.model(**batch_text_split).logits
+                
+                sentiment_output_split = sentiment_output_split
+                batch_sentiment.index_add_(dim=0, index=date_ids_split, source=sentiment_output_split)
+            
+        batch_sentiment = batch_sentiment.view(self.batch_size, self.window_length, self.output_size)
 
-            sentiment_output = torch.cat(sentiment_output, dim=0)
-            sentiment_output_splits = sentiment_output.split(lengths, dim=0)
-
-            date_ids_splits = date_ids.split(lengths, dim=0)
-
-            # TODO: Map into 1d and use one index_add_
-
-            for i in range(len(lengths)):
-                if lengths[i] > 0:
-                    batch_sentiment[i, :, :].index_add_(dim=0, index=date_ids_splits[i], source=sentiment_output_splits[i])
-
+        # TODO: Make up something better. 
+        # > Why would you pass prediction part to model at all then?
+        
         # Future mask for news
         batch_sentiment[:, self.sequence_length:, :].fill_(float('nan'))
 
@@ -93,7 +96,7 @@ class TimeSeriesModel(nn.Module):
         num_static_categorical_features = len(config.features.static_categorical_features)
         num_static_real_features = len(config.features.static_real_features)
 
-        cardinality = config.cardinality
+        cardinality = config.time_series_model.cardinality
         assert isinstance(cardinality, list)
 
         embedding_dimension = [config.time_series_model.embedding_dimension for _ in range(num_static_categorical_features)]
@@ -134,7 +137,7 @@ class TimeSeriesModel(nn.Module):
 
         return model
     
-    def forward(self, batch):
+    def _prepare_batch(self, batch):
 
         batch_num = batch.pop('batch_num')
         batch_sentiment = batch.pop('batch_sentiment')
@@ -155,8 +158,29 @@ class TimeSeriesModel(nn.Module):
         batch_num.past_time_features = batch_time_features[:, :self.sequence_length, :]
         batch_num.future_time_features = batch_time_features[:, self.sequence_length:, :]
 
-        batch_output = self.model(**batch_num)
+        return batch_num
+    
+    
+    def forward(self, batch):
 
+        batch = self._prepare_batch(batch)
+        batch_output = self.model(**batch)
+
+        return batch_output
+    
+    def generate(self, batch):
+
+        batch = self._prepare_batch(batch)
+        
+        batch_output = self.time_series_model.generate(
+            past_values=batch["past_values"],
+            past_time_features=batch["past_time_features"],
+            past_observed_mask=batch["past_observed_mask"],
+            static_categorical_features=batch["static_categorical_features"],
+            static_real_features=batch["static_real_features"],
+            future_time_features=batch["future_time_features"],
+        )
+        
         return batch_output
 
 
@@ -186,7 +210,18 @@ class FinformerModel(nn.Module):
 
         return batch_output
     
-    def __call__(self, **inputs):
-        return self.forward(**inputs)
+    def generate(self, **inputs):
 
+        if ('max_length' in inputs) or ('num_beams' in inputs):
+            print(inputs)
 
+        batch = FinformerBatch(
+            **inputs
+        )
+        
+        batch_sentiment = self.sentiment_model(batch)
+        batch.batch_sentiment = batch_sentiment
+
+        batch_output = self.time_series_model.generate(batch)
+
+        return batch_output

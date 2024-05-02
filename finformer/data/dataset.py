@@ -8,7 +8,7 @@ from torch.utils.data import Dataset, DataLoader
 from transformers import AutoTokenizer
 
 from finformer.data.data import FinformerData
-from finformer.utils import FinformerConfig, FinformerBatch, filter_none, get_device
+from finformer.utils import FinformerBatch, filter_none, get_device
 
 
 def get_split_dataset(config, data=None):
@@ -160,11 +160,20 @@ class FinformerCollator:
             lambda output_split: dict(zip(keys, output_split)), 
             zip(*batch_text_splits)
         ))
+        
+        batch_offset = 0
+        _date_ids = list()
 
-        date_ids = filter_none(date_ids)
-        date_ids = torch.cat(date_ids, dim=0)
+        for i in range(len(date_ids)):
+            date_id = date_ids.pop(i)
+            if date_id is not None:
+                _date_ids.append(date_id + batch_offset)
+                batch_offset += date_id.size(0)
 
-        return batch_text_splits, date_ids
+        date_ids_cat = torch.cat(_date_ids, dim=0)
+        date_ids_splits = date_ids_cat.split(self.config.sentiment_model.max_batch_size, dim=0)
+
+        return batch_text_splits, date_ids_splits
     
     def _collate_batch_num(self, batch_num):
 
@@ -186,18 +195,18 @@ class FinformerCollator:
 
     def collate_fn(self, batch):
 
-        batch_text, batch_num, tickers, date_offsets, date_ids, lengths = zip(*batch)
+        batch_text, date_ids, batch_num = zip(*batch)
 
-        batch_text_splits, date_ids = self._collate_batch_text(batch_text, date_ids)
+        batch_text_splits, date_ids_splits = self._collate_batch_text(batch_text, date_ids)
         batch_num = self._collate_batch_num(batch_num)
 
         collated_batch = dict(
             batch_text_splits=batch_text_splits,
-            date_ids=date_ids,
+            date_ids_splits=date_ids_splits,
             batch_num=batch_num,
-            tickers=tickers,
-            date_offsets=date_offsets,
-            lengths=lengths,
+            #tickers=tickers,
+            #date_offsets=date_offsets,
+            #lengths=lengths,
         )
 
         return collated_batch
@@ -208,7 +217,7 @@ class FinformerCollator:
 
 class FinformerDataset(Dataset):
 
-    def __init__(self, config: FinformerConfig, data: FinformerData = None, index: List = None):
+    def __init__(self, config, data: FinformerData = None, index: List = None):
 
         self.config = config
 
@@ -258,12 +267,12 @@ class FinformerDataset(Dataset):
         ticker_index = ticker
         date_index = self.batch_date_index + pd.to_timedelta(date_offset, unit='D')
 
-        batch_text, batch_num, date_ids, length = self.get_batch(ticker_index, date_index)
+        batch_text, batch_num, date_ids = self.get_batch(ticker_index, date_index)
 
         if date_ids is not None:
             date_ids -= date_offset
 
-        return batch_text, batch_num, ticker, date_offset, date_ids, length
+        return batch_text, date_ids, batch_num
 
     def get_batch(self, ticker_index, date_index):
 
@@ -273,7 +282,7 @@ class FinformerDataset(Dataset):
         for key, value in batch_num.items():
             batch_num[key] = value.unsqueeze(0)
 
-        return batch_text, batch_num, date_ids, length
+        return batch_text, batch_num, date_ids
 
     def get_text(self, ticker_index, date_index):
 

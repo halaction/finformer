@@ -1,6 +1,6 @@
 from copy import deepcopy
 
-from transformers import Trainer, TrainingArguments, TrainerCallback
+from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments, TrainerCallback
 from evaluate import load
 
 from omegaconf import DictConfig
@@ -58,7 +58,7 @@ class MetricsCallback(TrainerCallback):
         return self._callback(args, state, control, **kwargs)
 
 
-class FinformerTrainer(Trainer):
+class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
 
     def __init__(self, config: DictConfig = None):
         
@@ -75,7 +75,12 @@ class FinformerTrainer(Trainer):
 
         model = FinformerModel(config)
 
-        training_args = TrainingArguments(**config.training_args)
+        training_args = Seq2SeqTrainingArguments(
+            **config.training_args,
+            predict_with_generate=True,
+            generation_max_length=config.params.prediction_length,
+            generation_num_beams=1,
+        )
 
         # Init Trainer
         super().__init__(

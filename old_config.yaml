@@ -30,17 +30,16 @@ training_args:
   logging_steps: 50
 sentiment_model:
   model:
-    _target_: AutoModelForSequenceClassification
     name: ProsusAI/finbert
-    pretrained: true
   output_size: 3
-  max_batch_size: 16
+  output_type: features
+  max_batch_size: 32
   max_length: 128
 time_series_model: 
   model:
     _target_: TimeSeriesTransformerModel
     name: null
-  max_batch_size: 16
+  cardinality: null
   embedding_dimension: 16
 hf:
   dataset_dir: raw-dataset
@@ -145,4 +144,3 @@ features:
   - low
   - high
   - volume
-cardinality: null

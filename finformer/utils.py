@@ -97,14 +97,14 @@ class BaseConfig:
     
     def __repr__(self):
         return json.dumps(self._cfg, indent=2)
-
+    
 
 class FinformerConfig(DotDict):
 
     def __init__(self, cfg: Dict = None):
 
         if cfg is None:
-            path = 'config.yaml'
+            path = 'old_config.yaml'
             with open(path, 'r', encoding='utf-8') as file:
                 cfg = yaml.safe_load(file)
 
