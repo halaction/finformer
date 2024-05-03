@@ -34,7 +34,7 @@ logging_strategy: steps
 logging_steps: 50
 
 save_strategy: steps
-save_strategy: 500
+save_steps: 500
 
 evaluation_strategy: steps
 eval_steps: 500
