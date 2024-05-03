@@ -379,7 +379,7 @@ class FinformerData:
             names=levels,
         )
 
-        df = df.reindex(index)
+        df = df.reindex(index, method='ffill')
 
         return df
 

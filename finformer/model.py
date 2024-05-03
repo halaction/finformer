@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from transformers import PreTrainedModel, PretrainedConfig
+from transformers import PreTrainedModel, PretrainedConfig, GenerationConfig
 from transformers import AutoModelForSequenceClassification
 from transformers import TimeSeriesTransformerConfig, TimeSeriesTransformerForPrediction
 from peft import LoraConfig, TaskType, get_peft_model
@@ -180,10 +180,6 @@ class TimeSeriesModel(nn.Module):
         )
         
         return batch_output
-    
-
-class GenerationConfig:
-    _from_model_config = False
 
 
 class FinformerModel(PreTrainedModel):

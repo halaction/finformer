@@ -1,3 +1,4 @@
+import numpy as np
 from copy import deepcopy
 from typing import Dict, Union, Any, Optional, List, Tuple
 
@@ -14,28 +15,36 @@ from finformer.data.dataset import FinformerCollator, get_split_dataset
 from finformer.model import FinformerModel
 
 
-mase_metric = load("evaluate-metric/mase")
-mape_metric = load("evaluate-metric/mape")
-smape_metric = load("evaluate-metric/smape")
+mape_metric = load("evaluate-metric/mape", "multilist")
+smape_metric = load("evaluate-metric/smape", "multilist")
+mse_metric = load("evaluate-metric/mse", "multilist")
+mae_metric = load("evaluate-metric/mae", "multilist")
 
-metrics = [mase_metric, mape_metric, smape_metric]
+metrics = [mape_metric, smape_metric, mse_metric, mae_metric]
 
 
 def get_compute_metrics(config):
 
+    value_features = config.features.value_features
+
     def compute_metrics(eval_prediction):
 
-        print('METRICS')
-
-        print(eval_prediction)
-
         future_values_pred = eval_prediction.predictions
-        future_values = eval_prediction.label_ids
+        future_values = np.nan_to_num(eval_prediction.label_ids)
 
-        metrics_values = {
-            metric.name: metric.compute(predictions=future_values_pred, references=future_values) 
-            for metric in metrics
-        }
+        metrics_values = dict()
+
+        for metric in metrics:
+            for i, value_feature in enumerate(value_features):
+                name = metric.name
+
+                key = f'{name}/{value_feature}'
+                value = metric.compute(
+                    predictions=future_values_pred[:, :, i].T, 
+                    references=future_values[:, :, i].T
+                )[name]
+
+                metrics_values[key] = value
 
         return metrics_values
     
@@ -47,8 +56,6 @@ def get_preprocess_logits_for_metrics(config):
     input_size = len(config.features.value_features)
 
     def preprocess_logits_for_metrics(logits, labels):
-
-        print('PREPROCESS')
 
         future_values_pred = logits.sequences.median(dim=1).values[:, :, :input_size]
 
@@ -118,8 +125,6 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
         has_labels = "batch_num" in inputs
         inputs = self._prepare_inputs(inputs)
 
-        # Priority (handled in generate):
-        # non-`None` gen_kwargs > model.generation_config > default GenerationConfig()
         if len(gen_kwargs) == 0 and hasattr(self, "_gen_kwargs"):
             gen_kwargs = self._gen_kwargs.copy()
         if "num_beams" in gen_kwargs and gen_kwargs["num_beams"] is None:
@@ -134,8 +139,7 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
         )
 
         generation_inputs = inputs.copy()
-        # If the `decoder_input_ids` was created from `labels`, evict the former, so that the model can freely generate
-        # (otherwise, it would continue generating from the padded `decoder_input_ids`)
+
         if (
             "future_values" in generation_inputs
             and "decoder_input_ids" in generation_inputs
@@ -147,9 +151,6 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
 
         generated_tokens = self.model.generate(**generation_inputs, **gen_kwargs)
 
-        # Temporary hack to ensure the generation config is not initialized for each iteration of the evaluation loop
-        # TODO: remove this hack when the legacy code that initializes generation_config from a model config is
-        # removed in https://github.com/huggingface/transformers/blob/98d88b23f54e5a23e741833f1e973fdf600cc2c5/src/transformers/generation/utils.py#L1183
         if self.model.generation_config._from_model_config:
             self.model.generation_config._from_model_config = False
 
@@ -169,10 +170,6 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
 
         if has_labels:
             labels = inputs['batch_num']['batch_values'][:, self.sequence_length:, :]
-        #    if labels.shape[-1] < gen_config.max_length:
-        #        labels = self._pad_tensors_to_max_len(labels, gen_config.max_length)
-        #    elif gen_config.max_new_tokens is not None and labels.shape[-1] < gen_config.max_new_tokens + 1:
-        #        labels = self._pad_tensors_to_max_len(labels, gen_config.max_new_tokens + 1)
         else:
             labels = None
 
