@@ -40,6 +40,15 @@ def compute_metrics(eval_prediction):
     return metrics_values
 
 
+def preprocess_logits_for_metrics(logits, labels):
+
+    print(logits, labels)
+
+    logits = logits.median(dim=1).values[:, :, :5]
+
+    return logits
+
+
 class MetricsCallback(TrainerCallback):
     
     def __init__(self, trainer):
@@ -98,6 +107,7 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
             },
             data_collator=data_collator,
             compute_metrics=compute_metrics,
+            preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         )
 
         callback = MetricsCallback(self)
@@ -155,7 +165,7 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
         # removed in https://github.com/huggingface/transformers/blob/98d88b23f54e5a23e741833f1e973fdf600cc2c5/src/transformers/generation/utils.py#L1183
         if self.model.generation_config._from_model_config:
             self.model.generation_config._from_model_config = False
-            
+
         with torch.no_grad():
             if has_labels:
                 with self.compute_loss_context_manager():
