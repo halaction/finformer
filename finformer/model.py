@@ -1,5 +1,3 @@
-from hydra import instantiate
-
 import torch
 import torch.nn as nn
 
@@ -7,6 +5,8 @@ from transformers import PreTrainedModel, PretrainedConfig
 from transformers import AutoModelForSequenceClassification
 from transformers import TimeSeriesTransformerConfig, TimeSeriesTransformerForPrediction
 from peft import LoraConfig, TaskType, get_peft_model
+
+from hydra.utils import instantiate
 
 from finformer.utils import FinformerBatch
 
