@@ -192,7 +192,7 @@ class FinformerModel(PreTrainedModel):
         self,
         config
     ):
-        super().__init__()
+        super().__init__(config)
         
         self._config = config
 
