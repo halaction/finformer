@@ -119,7 +119,8 @@ class TimeSeriesModel(nn.Module):
         model_config.num_static_categorical_features = len(config.features.static_categorical_features)
         model_config.num_static_real_features = len(config.features.static_real_features)
 
-        model_config.embedding_dimension = [model_config.embedding_dimension for _ in range(model_config.num_static_categorical_features)]
+        if model_config.embedding_dimension is None:
+            model_config.embedding_dimension = [model_config.embedding_dimension for _ in range(model_config.num_static_categorical_features)]
 
         model = instantiate(config.time_series_model.model)
 
