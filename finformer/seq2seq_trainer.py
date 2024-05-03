@@ -54,7 +54,7 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
         config.training_args.per_device_eval_batch_size = config.params.batch_size
 
         self.sequence_length = config.params.context_length + config.params.max_lag
-        self.input_size = len(self.config.features.value_features)
+        self.input_size = len(config.features.value_features)
 
         self._config = config
 
