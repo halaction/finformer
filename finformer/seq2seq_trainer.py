@@ -21,73 +21,9 @@ smape_metric = load("evaluate-metric/smape")
 metrics = [mase_metric, mape_metric, smape_metric]
 
 
-class MetricsCallback(TrainerCallback):
-    
-    def __init__(self, trainer):
-        super().__init__()
-        self._trainer = trainer
+def get_compute_metrics(config):
 
-    def _callback(self, args, state, control, **kwargs):
-        if control.should_evaluate:
-            control_copy = deepcopy(control)
-            self._trainer.evaluate(eval_dataset=self._trainer.train_dataset, metric_key_prefix='train')
-            return control_copy
-
-    def on_log(self, args, state, control, **kwargs):
-        return self._callback(args, state, control, **kwargs)
-    
-    def on_step_end(self, args, state, control, **kwargs):
-        return self._callback(args, state, control, **kwargs)
-
-    def on_epoch_end(self, args, state, control, **kwargs):
-        return self._callback(args, state, control, **kwargs)
-
-
-class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
-
-    def __init__(self, config: DictConfig = None):
-        
-        if config is None:
-            config = get_config()
-        
-        config.training_args.per_device_train_batch_size = config.params.batch_size
-        config.training_args.per_device_eval_batch_size = config.params.batch_size * 4
-
-        self.sequence_length = config.params.context_length + config.params.max_lag
-        self.input_size = len(config.features.value_features)
-
-        self._config = config
-
-        dataset_train, dataset_val, dataset_test = get_split_dataset(config)
-        data_collator = FinformerCollator(config)
-
-        model = FinformerModel(config)
-
-        training_args = Seq2SeqTrainingArguments(
-            **config.training_args,
-            include_inputs_for_metrics=False,
-            predict_with_generate=True,
-            generation_max_length=config.params.prediction_length,
-            generation_num_beams=1,
-        )
-
-        # Init Trainer
-        super().__init__(
-            model=model,
-            args=training_args,
-            train_dataset=dataset_train,
-            eval_dataset={
-                'val': dataset_val, 
-                'test': dataset_test
-            },
-            data_collator=data_collator,
-        )
-
-        callback = MetricsCallback(self)
-        self.add_callback(callback) 
-
-
-    def compute_metrics(self, eval_prediction):
+    def compute_metrics(eval_prediction):
 
         print('METRICS')
 
@@ -106,17 +42,68 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
         }
 
         return metrics_values
+    
+    return compute_metrics
 
 
-    def preprocess_logits_for_metrics(self, logits, labels):
+def get_preprocess_logits_for_metrics(config):
+
+    sequence_length = config.params.context_length + config.params.max_lag
+    input_size = len(config.features.value_features)
+
+    def preprocess_logits_for_metrics(logits, labels):
 
         print('PREPROCESS')
 
-        future_values_pred = logits.sequences.median(dim=1).values[:, :, :self.input_size]
-        future_values = labels[:, self.sequence_length:, :]
+        future_values_pred = logits.sequences.median(dim=1).values[:, :, :input_size]
+        future_values = labels[:, sequence_length:, :]
 
         return future_values_pred, future_values
+    
+    return preprocess_logits_for_metrics
 
+
+class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
+
+    def __init__(self, config: DictConfig = None):
+        
+        if config is None:
+            config = get_config()
+        
+        config.training_args.per_device_train_batch_size = config.params.batch_size
+        config.training_args.per_device_eval_batch_size = config.params.batch_size * 4
+
+        self._config = config
+
+        dataset_train, dataset_val, dataset_test = get_split_dataset(config)
+        data_collator = FinformerCollator(config)
+
+        model = FinformerModel(config)
+
+        training_args = Seq2SeqTrainingArguments(
+            **config.training_args,
+            include_inputs_for_metrics=False,
+            predict_with_generate=True,
+            generation_max_length=config.params.prediction_length,
+            generation_num_beams=1,
+        )
+
+        compute_metrics = get_compute_metrics(config)
+        preprocess_logits_for_metrics = get_preprocess_logits_for_metrics(config)
+
+        # Init Trainer
+        super().__init__(
+            model=model,
+            args=training_args,
+            train_dataset=dataset_train,
+            eval_dataset={
+                'val': dataset_val, 
+                'test': dataset_test
+            },
+            data_collator=data_collator,
+            compute_metrics=compute_metrics,
+            preprocess_logits_for_metrics=preprocess_logits_for_metrics,
+        )
 
     def prediction_step(
         self,
