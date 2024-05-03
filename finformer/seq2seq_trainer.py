@@ -21,36 +21,6 @@ smape_metric = load("evaluate-metric/smape")
 metrics = [mase_metric, mape_metric, smape_metric]
 
 
-def compute_metrics(eval_prediction):
-
-    print(eval_prediction)
-
-    predictions = eval_prediction.predictions
-    label_ids = eval_prediction.label_ids
-    # predictions = predictions[:, 0]
-
-    print(predictions.shape)
-    print(label_ids.shape)
-
-    metrics_values = {
-        metric.name: metric.compute(predictions=predictions, references=label_ids) 
-        for metric in metrics
-    }
-
-    return metrics_values
-
-
-def preprocess_logits_for_metrics(logits, labels):
-
-    print(logits, labels)
-    sequences = logits.sequences
-
-    future_values_pred = logits.median(dim=1).values[:, :, :5]
-
-
-    return logits
-
-
 class MetricsCallback(TrainerCallback):
     
     def __init__(self, trainer):
@@ -83,6 +53,9 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
         config.training_args.per_device_train_batch_size = config.params.batch_size
         config.training_args.per_device_eval_batch_size = config.params.batch_size
 
+        self.sequence_length = config.params.context_length + config.params.max_lag
+        self.input_size = len(self.config.features.value_features)
+
         self._config = config
 
         dataset_train, dataset_val, dataset_test = get_split_dataset(config)
@@ -108,12 +81,37 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
                 'test': dataset_test
             },
             data_collator=data_collator,
-            compute_metrics=compute_metrics,
-            preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         )
 
         callback = MetricsCallback(self)
         self.add_callback(callback) 
+
+
+    def compute_metrics(self, eval_prediction):
+
+        print(eval_prediction)
+
+        predictions = eval_prediction.predictions
+        label_ids = eval_prediction.label_ids
+        # predictions = predictions[:, 0]
+
+        print(predictions.shape)
+        print(label_ids.shape)
+
+        metrics_values = {
+            metric.name: metric.compute(predictions=predictions, references=label_ids) 
+            for metric in metrics
+        }
+
+        return metrics_values
+
+
+    def preprocess_logits_for_metrics(self, logits, labels):
+
+        future_values_pred = logits.sequences.median(dim=1).values[:, :, :self.input_size]
+        future_values = labels[:, self.sequence_length:, :]
+
+        return future_values_pred, future_values
 
 
     def prediction_step(
