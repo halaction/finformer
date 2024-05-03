@@ -23,6 +23,8 @@ class SentimentModel(nn.Module):
         self.window_length = self.sequence_length + self.prediction_length
         self.output_size = config.sentiment_model.output_size
 
+        self.register_buffer('batch_sentiment', torch.zeros(size=(self.batch_size * self.window_length, self.output_size)))
+
     def init_model(self, config):
         
         model = AutoModelForSequenceClassification.from_pretrained(config.sentiment_model.model.name)
@@ -45,7 +47,7 @@ class SentimentModel(nn.Module):
         #batch_sentiment.fill_(0)
 
         # TODO: Move to params!!!
-        batch_sentiment = torch.zeros(size=(self.batch_size * self.window_length, self.output_size)).to(self.model.device)
+        batch_sentiment = self.batch_sentiment.detach().clone()
 
         if len(batch_text_splits) > 0: 
             
@@ -196,7 +198,7 @@ class FinformerModel(PreTrainedModel):
         pretrained_config = PretrainedConfig(
             name_or_path='finformer-model',
         )
-        
+
         super().__init__(pretrained_config)
         
         self._config = config
