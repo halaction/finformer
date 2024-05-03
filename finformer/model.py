@@ -200,6 +200,9 @@ class FinformerModel(PreTrainedModel):
         )
 
         super().__init__(pretrained_config)
+
+        # TODO: Check legacy
+        self.main_input_name = 'batch_num'
         
         self._config = config
 

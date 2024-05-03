@@ -81,7 +81,7 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
 
         training_args = Seq2SeqTrainingArguments(
             **config.training_args,
-            include_inputs_for_metrics=True,
+            include_inputs_for_metrics=False,
             predict_with_generate=True,
             generation_max_length=config.params.prediction_length,
             generation_num_beams=1,
@@ -155,15 +155,7 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
         # removed in https://github.com/huggingface/transformers/blob/98d88b23f54e5a23e741833f1e973fdf600cc2c5/src/transformers/generation/utils.py#L1183
         if self.model.generation_config._from_model_config:
             self.model.generation_config._from_model_config = False
-
-        # Retrieves GenerationConfig from model.generation_config
-        gen_config = self.model.generation_config
-        # in case the batch is shorter than max length, the output should be padded
-        #if generated_tokens.shape[-1] < gen_config.max_length:
-        #    generated_tokens = self._pad_tensors_to_max_len(generated_tokens, gen_config.max_length)
-        #elif gen_config.max_new_tokens is not None and generated_tokens.shape[-1] < gen_config.max_new_tokens + 1:
-        #    generated_tokens = self._pad_tensors_to_max_len(generated_tokens, gen_config.max_new_tokens + 1)
-
+            
         with torch.no_grad():
             if has_labels:
                 with self.compute_loss_context_manager():
