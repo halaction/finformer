@@ -23,7 +23,7 @@ weight_decay: 0.01
 max_grad_norm: 1
 gradient_accumulation_steps: 1
 
-lr_scheduler_type: cosine_with_warmup
+lr_scheduler_type: constant_with_warmup
 warmup_steps: 300
 
 fp16: true
