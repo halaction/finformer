@@ -59,9 +59,8 @@ class SentimentModel(nn.Module):
 
         #batch_sentiment = self.batch_output
         #batch_sentiment.fill_(0)
-
-        # TODO: Move to params!!!
-        batch_sentiment = self.batch_sentiment.detach().clone()
+        
+        batch_sentiment = self.batch_sentiment.detach().clone()[:batch.batch_num.batch_values.size(0), ...]
 
         if len(batch_text_splits) > 0: 
             

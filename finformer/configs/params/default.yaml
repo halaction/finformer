@@ -2,6 +2,8 @@ batch_size: 16
 train_size: 0.7
 val_size: 0.1
 test_size: 0.2
+val_start_date: '2023-01-01'
+test_start_date: '2023-04-15'
 context_length: 30
 prediction_length: 15
 max_lag: 1
