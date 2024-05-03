@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from transformers import PreTrainedModel
+from transformers import PreTrainedModel, PretrainedConfig
 from transformers import AutoModelForSequenceClassification
 from transformers import TimeSeriesTransformerConfig, TimeSeriesTransformerForPrediction
 
@@ -192,7 +192,12 @@ class FinformerModel(PreTrainedModel):
         self,
         config
     ):
-        super().__init__(config)
+        
+        pretrained_config = PretrainedConfig(
+            name_or_path='finformer-model',
+        )
+        
+        super().__init__(pretrained_config)
         
         self._config = config
 
