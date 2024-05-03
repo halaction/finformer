@@ -1,7 +1,7 @@
-output_dir: trainer/default
+output_dir: trainer/full
 
 report_to: 'wandb'
-run_name: trainer-default
+run_name: trainer-full
 
 push_to_hub: true
 hub_model_id: halaction/finformer-model
@@ -15,7 +15,7 @@ label_names:
 per_device_train_batch_size: null
 per_device_eval_batch_size: null
 
-num_train_epochs: 3
+num_train_epochs: 25
 max_steps: -1
 
 learning_rate: 0.00005
@@ -34,8 +34,8 @@ log_level: info
 logging_strategy: steps
 logging_steps: 50
 
-save_strategy: steps
-save_steps: 500
+save_strategy: epoch
+# save_steps: 500
 
-evaluation_strategy: steps
-eval_steps: 500
+evaluation_strategy: epoch
+# eval_steps: 500

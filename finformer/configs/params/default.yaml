@@ -9,6 +9,7 @@ prediction_length: 15
 max_lag: 1
 start_date: '2020-01-01'
 end_date: '2024-04-15'
+target_transform: log
 min_news: 300
 max_news_daily: 5
 min_trading_days: 365

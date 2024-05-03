@@ -30,11 +30,12 @@ warmup_steps: 300
 #half_precision_backend: auto
 
 log_level: info
+
 logging_strategy: steps
 logging_steps: 50
 
-save_strategy: steps
-save_steps: 500
+save_strategy: epoch
+# save_steps: 500
 
-evaluation_strategy: steps
-eval_steps: 500
+evaluation_strategy: epoch
+# eval_steps: 500

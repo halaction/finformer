@@ -1,6 +1,6 @@
 import os
 from tqdm.auto import tqdm
-from dotenv import load_dotenv
+import numpy as np
 import pandas as pd
 from itertools import product
 
@@ -28,11 +28,7 @@ class FinformerData:
 
         # self.features = self._get_features()
 
-        if hf_token is None:
-            load_dotenv()
-            hf_token = os.environ['HF_TOKEN']
-
-        login(token=hf_token)
+        login()
 
         self.load(force=force)
         self.save(force=force)
@@ -380,6 +376,14 @@ class FinformerData:
         )
 
         df = df.reindex(index, method='ffill')
+
+        # Transform target
+        if self.config.params.target_transform is None:
+            pass
+        elif self.config.params.target_transform == 'log':
+            df[features] = np.log1p(df[features])
+        else:
+            raise ValueError('Unknown target transform.')
 
         return df
 

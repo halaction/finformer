@@ -4,9 +4,9 @@ model:
     _target_: transformers.TimeSeriesTransformerConfig
     context_length: null
     prediction_length: null
-    distribution_output: student_t
+    distribution_output: normal
     loss: nll
-    scaling: mean
+    scaling: null
     input_size: null
     lags_sequence: null
     num_time_features: null

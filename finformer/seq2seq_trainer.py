@@ -5,7 +5,7 @@ from typing import Dict, Union, Any, Optional, List, Tuple
 import torch
 from torch import nn
 
-from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments, TrainerCallback
+from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 from evaluate import load
 
 from omegaconf import DictConfig
@@ -26,11 +26,21 @@ metrics = [mape_metric, smape_metric, mse_metric, mae_metric]
 def get_compute_metrics(config):
 
     value_features = config.features.value_features
+    n_value_features = len(value_features)
+    target_transform = config.params.target_transform
 
     def compute_metrics(eval_prediction):
 
         future_values_pred = eval_prediction.predictions
         future_values = np.nan_to_num(eval_prediction.label_ids)
+        
+        if target_transform is None:
+            pass
+        elif target_transform == 'log':
+            future_values_pred[:, :, :n_value_features] = np.expm1(future_values_pred)
+            future_values = np.expm1(future_values)
+        else:
+            raise ValueError('Unknown target transform.')
 
         metrics_values = dict()
 
