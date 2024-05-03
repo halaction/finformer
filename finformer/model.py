@@ -5,6 +5,8 @@ from transformers import PreTrainedModel, PretrainedConfig
 from transformers import AutoModelForSequenceClassification
 from transformers import TimeSeriesTransformerConfig, TimeSeriesTransformerForPrediction
 
+from peft import LoraConfig, TaskType, get_peft_model
+
 from finformer.utils import FinformerBatch
 
 
@@ -35,6 +37,17 @@ class SentimentModel(nn.Module):
             model.classifier = nn.Linear(model.config.hidden_size, config.sentiment_model.output_size)
         else:
             raise ValueError(f'Unknown output_type `{config.sentiment_model.output_type}`.')
+
+        peft_config = LoraConfig(
+            task_type=TaskType.SEQ_CLS, 
+            inference_mode=False, 
+            r=8, 
+            lora_alpha=32, 
+            lora_dropout=0.1
+        )
+
+        model = get_peft_model(model, peft_config)
+        model.print_trainable_parameters()
 
         return model
 
