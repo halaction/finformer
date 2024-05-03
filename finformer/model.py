@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+from transformers import PreTrainedModel
 from transformers import AutoModelForSequenceClassification
 from transformers import TimeSeriesTransformerConfig, TimeSeriesTransformerForPrediction
 
@@ -185,7 +186,7 @@ class GenerationConfig:
     _from_model_config = False
 
 
-class FinformerModel(nn.Module):
+class FinformerModel(PreTrainedModel):
 
     def __init__(
         self,

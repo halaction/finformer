@@ -1,8 +1,40 @@
 output_dir: trainer/default
+
+report_to: 'wandb'
+run_name: trainer-default
+
+push_to_hub: true
+hub_model_id: halaction/finformer-model
+hub_strategy: checkpoint
+hub_private_repo: false
+
+prediction_loss_only: False
+label_names: 
+- future_values
+
 per_device_train_batch_size: null
 per_device_eval_batch_size: null
-num_train_epochs: 5
-learning_rate: 0.0003
+
+num_train_epochs: 3
+max_steps: -1
+
+learning_rate: 0.00005
 weight_decay: 0.01
+max_grad_norm: 1
+gradient_accumulation_steps: 1
+
+lr_scheduler_type: cosine_with_warmup
+warmup_steps: 300
+
+fp16: true
+half_precision_backend: auto
+
 log_level: info
+logging_strategy: steps
 logging_steps: 50
+
+save_strategy: steps
+save_strategy: 500
+
+evaluation_strategy: steps
+eval_steps: 500
