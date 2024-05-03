@@ -56,9 +56,8 @@ def get_preprocess_logits_for_metrics(config):
         print('PREPROCESS')
 
         future_values_pred = logits.sequences.median(dim=1).values[:, :, :input_size]
-        future_values = labels[:, sequence_length:, :]
 
-        return future_values_pred, future_values
+        return future_values_pred
     
     return preprocess_logits_for_metrics
 
