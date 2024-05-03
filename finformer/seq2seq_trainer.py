@@ -43,8 +43,10 @@ def compute_metrics(eval_prediction):
 def preprocess_logits_for_metrics(logits, labels):
 
     print(logits, labels)
+    sequences = logits.sequences
 
-    logits = logits.median(dim=1).values[:, :, :5]
+    future_values_pred = logits.median(dim=1).values[:, :, :5]
+
 
     return logits
 
@@ -128,7 +130,7 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
                 model, inputs, prediction_loss_only=prediction_loss_only, ignore_keys=ignore_keys
             )
 
-        has_labels = "labels" in inputs
+        has_labels = "batch_num" in inputs
         inputs = self._prepare_inputs(inputs)
 
         # Priority (handled in generate):
@@ -150,9 +152,9 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
         # If the `decoder_input_ids` was created from `labels`, evict the former, so that the model can freely generate
         # (otherwise, it would continue generating from the padded `decoder_input_ids`)
         if (
-            "labels" in generation_inputs
+            "future_values" in generation_inputs
             and "decoder_input_ids" in generation_inputs
-            and generation_inputs["labels"].shape == generation_inputs["decoder_input_ids"].shape
+            and generation_inputs["future_values"].shape == generation_inputs["decoder_input_ids"].shape
         ):
             generation_inputs = {
                 k: v for k, v in inputs.items() if k not in ("decoder_input_ids", "decoder_attention_mask")
@@ -181,7 +183,7 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
             return loss, None, None
 
         if has_labels:
-            labels = inputs["labels"]
+            labels = inputs['batch_num']['batch_values']
         #    if labels.shape[-1] < gen_config.max_length:
         #        labels = self._pad_tensors_to_max_len(labels, gen_config.max_length)
         #    elif gen_config.max_new_tokens is not None and labels.shape[-1] < gen_config.max_new_tokens + 1:
