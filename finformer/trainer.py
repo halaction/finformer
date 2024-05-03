@@ -19,6 +19,8 @@ metrics = [mase_metric, mape_metric, smape_metric]
 
 def compute_metrics(eval_prediction):
 
+    print('METRICS')
+
     print(eval_prediction)
 
     predictions = eval_prediction.predictions
@@ -64,7 +66,7 @@ class FinformerTrainer(Trainer):
         
         if config is None:
             config = get_config()
-        
+
         config.training_args.per_device_train_batch_size = config.params.batch_size
         config.training_args.per_device_eval_batch_size = config.params.batch_size
 

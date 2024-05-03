@@ -215,8 +215,4 @@ class FinformerModel(PreTrainedModel):
 
         batch_output = self.time_series_model.generate(batch)
 
-        print(batch_output)
-        print(batch_output.sequences.size())
-        print(batch_output.sequences.median(dim=1).values[:4, :, :5])
-
         return batch_output
