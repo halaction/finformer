@@ -1,7 +1,7 @@
 model:
-  _target_: TimeSeriesTransformerModel
+  _target_: transformers.TimeSeriesTransformerModel
   config:
-    _target_: TimeSeriesTransformerConfig
+    _target_: transformers.TimeSeriesTransformerConfig
     context_length: null
     prediction_length: null
     distribution_output: student_t
