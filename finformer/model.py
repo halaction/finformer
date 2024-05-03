@@ -57,12 +57,20 @@ class SentimentModel(nn.Module):
         batch_text_splits = batch.pop('batch_text_splits')
         date_ids_splits = batch.pop('date_ids_splits')
 
-        batch_size = batch.batch_num.batch_values.size(0)
+        batch_values = batch.batch_num.batch_values
+        batch_size = batch_values.size(0)
+        dtype = batch_values.dtype
+        device = batch_values.device
 
         #batch_sentiment = self.batch_output
         #batch_sentiment.fill_(0)
         
-        batch_sentiment = self.batch_sentiment.detach().clone()
+        #batch_sentiment = self.batch_sentiment.detach().clone()
+        batch_sentiment = torch.zeros(
+            size=(batch_size * self.window_length, self.output_size),
+            dtype=dtype,
+            device=device,
+        )
 
         if len(batch_text_splits) > 0: 
             
@@ -76,8 +84,7 @@ class SentimentModel(nn.Module):
                 sentiment_output_split = sentiment_output_split
                 batch_sentiment.index_add_(dim=0, index=date_ids_split, source=sentiment_output_split)
             
-        batch_sentiment = batch_sentiment.view(self.batch_size, self.window_length, self.output_size)
-        batch_sentiment = batch_sentiment[:batch_size, :, :]
+        batch_sentiment = batch_sentiment.view(batch_size, self.window_length, self.output_size)
 
         # TODO: Make up something better. 
         # > Why would you pass prediction part to model at all then?

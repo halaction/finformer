@@ -51,7 +51,7 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
             config = get_config()
         
         config.training_args.per_device_train_batch_size = config.params.batch_size
-        config.training_args.per_device_eval_batch_size = config.params.batch_size
+        config.training_args.per_device_eval_batch_size = config.params.batch_size * 4
 
         self.sequence_length = config.params.context_length + config.params.max_lag
         self.input_size = len(config.features.value_features)
@@ -89,6 +89,8 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
 
     def compute_metrics(self, eval_prediction):
 
+        print('METRICS')
+
         print(eval_prediction)
 
         predictions = eval_prediction.predictions
@@ -107,6 +109,8 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
 
 
     def preprocess_logits_for_metrics(self, logits, labels):
+
+        print('PREPROCESS')
 
         future_values_pred = logits.sequences.median(dim=1).values[:, :, :self.input_size]
         future_values = labels[:, self.sequence_length:, :]
