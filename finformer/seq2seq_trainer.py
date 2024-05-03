@@ -29,15 +29,11 @@ def get_compute_metrics(config):
 
         print(eval_prediction)
 
-        predictions = eval_prediction.predictions
-        label_ids = eval_prediction.label_ids
-        # predictions = predictions[:, 0]
-
-        print(predictions.shape)
-        print(label_ids.shape)
+        future_values_pred = eval_prediction.predictions
+        future_values = eval_prediction.label_ids
 
         metrics_values = {
-            metric.name: metric.compute(predictions=predictions, references=label_ids) 
+            metric.name: metric.compute(predictions=future_values_pred, references=future_values) 
             for metric in metrics
         }
 
@@ -48,7 +44,6 @@ def get_compute_metrics(config):
 
 def get_preprocess_logits_for_metrics(config):
 
-    sequence_length = config.params.context_length + config.params.max_lag
     input_size = len(config.features.value_features)
 
     def preprocess_logits_for_metrics(logits, labels):
@@ -71,6 +66,8 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
         
         config.training_args.per_device_train_batch_size = config.params.batch_size
         config.training_args.per_device_eval_batch_size = config.params.batch_size * 4
+
+        self.sequence_length = config.params.context_length + config.params.max_lag
 
         self._config = config
 
@@ -171,7 +168,7 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
             return loss, None, None
 
         if has_labels:
-            labels = inputs['batch_num']['batch_values']
+            labels = inputs['batch_num']['batch_values'][:, self.sequence_length:, :]
         #    if labels.shape[-1] < gen_config.max_length:
         #        labels = self._pad_tensors_to_max_len(labels, gen_config.max_length)
         #    elif gen_config.max_new_tokens is not None and labels.shape[-1] < gen_config.max_new_tokens + 1:
