@@ -110,7 +110,7 @@ class TimeSeriesModel(nn.Module):
         model_config.prediction_length = self.prediction_length
         model_config.context_length = self.context_length
 
-        model_config.input_size = len(config.features.value_features) + config.sentiment_model.output_size
+        model_config.input_size = len(config.features.value_features) + self.output_size
         model_config.lags_sequence = list(range(1, self.config.params.max_lag + 1))
 
         model_config.num_time_features = len(config.features.time_features)
@@ -119,7 +119,7 @@ class TimeSeriesModel(nn.Module):
         model_config.num_static_categorical_features = len(config.features.static_categorical_features)
         model_config.num_static_real_features = len(config.features.static_real_features)
 
-        if model_config.embedding_dimension is None:
+        if isinstance(model_config.embedding_dimension, int):
             model_config.embedding_dimension = [model_config.embedding_dimension for _ in range(model_config.num_static_categorical_features)]
 
         model = instantiate(config.time_series_model.model)
