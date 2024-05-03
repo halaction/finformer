@@ -375,16 +375,17 @@ class FinformerData:
             names=levels,
         )
 
-        df = df.reindex(index, method='ffill')
+        df = df.reindex(index)
+        df = df.groupby(level='ticker').ffill().bfill()
 
         # Transform target
         if self.config.params.target_transform is None:
             pass
         elif self.config.params.target_transform == 'log':
-            df[features] = np.log1p(df[features])
+            df = np.log1p(df)
         else:
             raise ValueError('Unknown target transform.')
-
+        
         return df
 
     def get_calendar(self):

@@ -29,7 +29,7 @@ warmup_steps: 300
 #fp16: false
 #half_precision_backend: auto
 
-log_level: info
+log_level: debug
 
 logging_strategy: steps
 logging_steps: 50
