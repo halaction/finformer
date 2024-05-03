@@ -1,5 +1,5 @@
 model:
-  _target_: transformers.TimeSeriesTransformerModel
+  _target_: transformers.TimeSeriesTransformerForPrediction
   config:
     _target_: transformers.TimeSeriesTransformerConfig
     context_length: null
