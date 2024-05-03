@@ -1,10 +1,11 @@
+from hydra import instantiate
+
 import torch
 import torch.nn as nn
 
 from transformers import PreTrainedModel, PretrainedConfig
 from transformers import AutoModelForSequenceClassification
 from transformers import TimeSeriesTransformerConfig, TimeSeriesTransformerForPrediction
-
 from peft import LoraConfig, TaskType, get_peft_model
 
 from finformer.utils import FinformerBatch
@@ -102,51 +103,20 @@ class TimeSeriesModel(nn.Module):
 
     def init_model(self, config):
 
-        input_size = len(config.features.value_features) + config.sentiment_model.output_size
-        lags_sequence = list(range(1, self.config.params.max_lag + 1))
+        model_config = config.time_series_model.model.config
 
-        num_time_features = len(config.features.time_features)
-        num_dynamic_real_features = len(config.features.dynamic_real_features)
+        model_config.input_size = len(config.features.value_features) + config.sentiment_model.output_size
+        model_config.lags_sequence = list(range(1, self.config.params.max_lag + 1))
 
-        num_static_categorical_features = len(config.features.static_categorical_features)
-        num_static_real_features = len(config.features.static_real_features)
+        model_config.num_time_features = len(config.features.time_features)
+        model_config.num_dynamic_real_features = len(config.features.dynamic_real_features)
 
-        cardinality = config.time_series_model.cardinality
-        embedding_dimension = [config.time_series_model.embedding_dimension for _ in range(num_static_categorical_features)]
+        model_config.num_static_categorical_features = len(config.features.static_categorical_features)
+        model_config.num_static_real_features = len(config.features.static_real_features)
 
-        model_config = TimeSeriesTransformerConfig(
-            context_length=config.params.context_length,
-            prediction_length=config.params.prediction_length,
-            distribution_output='student_t',
-            loss='nll',
-            scaling=None,
-            input_size=input_size,
-            lags_sequence=lags_sequence,
-            num_time_features=num_time_features,
-            num_dynamic_real_features=num_dynamic_real_features,
-            num_static_categorical_features=num_static_categorical_features,
-            num_static_real_features=num_static_real_features,
-            cardinality=cardinality,
-            embedding_dimension=embedding_dimension,
-            d_model=64,
-            encoder_layers=2,
-            decoder_layers=2,
-            encoder_attention_heads=2,
-            decoder_attention_head=2,
-            encoder_ffn_dim=2,
-            decoder_ffn_dim=2,
-            activation_function='gelu',
-            dropout=0.1,
-            encoder_layerdrop=0.1,
-            decoder_layerdrop=0.1,
-            attention_dropout=0.1,
-            activation_dropout=0.1,    
-            num_parallel_samples=100,
-            init_std=2e-2,
-            use_cache=True,
-        )
+        model_config.embedding_dimension = [model_config.embedding_dimension for _ in range(model_config.num_static_categorical_features)]
 
-        model = TimeSeriesTransformerForPrediction(model_config)
+        model = instantiate(config.time_series_model.model)
 
         return model
     
@@ -213,9 +183,6 @@ class FinformerModel(PreTrainedModel):
         )
 
         super().__init__(pretrained_config)
-
-        # TODO: Check legacy
-        self.main_input_name = 'batch_num'
         
         self._config = config
 

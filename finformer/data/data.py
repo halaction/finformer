@@ -183,7 +183,7 @@ class FinformerData:
         for column, encoder in label_encoders.items():
             self.profile[column] = encoder.fit_transform(self.profile[column])
 
-        self.config.time_series_model.cardinality = [
+        self.config.time_series_model.config.cardinality = [
             len(label_encoders[column].classes_) 
             for column in columns
         ]

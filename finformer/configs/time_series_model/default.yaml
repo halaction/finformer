@@ -1,5 +1,33 @@
 model:
   _target_: TimeSeriesTransformerModel
-  name: null
-embedding_dimension: 16
-cardinality: null
+  config:
+    _target_: TimeSeriesTransformerConfig
+    context_length: null
+    prediction_length: null
+    distribution_output: student_t
+    loss: nll
+    scaling: null
+    input_size: null
+    lags_sequence: null
+    num_time_features: null
+    num_dynamic_real_features: null
+    num_static_categorical_features: null
+    num_static_real_features: null
+    cardinality: null
+    embedding_dimension: 16
+    d_model: 64
+    encoder_layers: 2
+    decoder_layers: 2
+    encoder_attention_heads: 2
+    decoder_attention_head: 2
+    encoder_ffn_dim: 2
+    decoder_ffn_dim: 2
+    activation_function: gelu
+    dropout: 0.1
+    encoder_layerdrop: 0.1
+    decoder_layerdrop: 0.1
+    attention_dropout: 0.1
+    activation_dropout: 0.1    
+    num_parallel_samples: 100
+    init_std: 0.02
+    use_cache: True
