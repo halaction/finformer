@@ -36,7 +36,7 @@ def get_split_dataset(config, data=None):
 
 def split_index(index, train_size=None, val_size=90, test_size=360):
     
-    _, date_offsets = zip(index)
+    _, date_offsets = zip(*index)
     max_date_offset = max(date_offsets)
 
     test_date_offset = max_date_offset - test_size
