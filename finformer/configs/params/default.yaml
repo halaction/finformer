@@ -7,7 +7,7 @@ prediction_length: 15
 max_lag: 1
 start_date: '2020-01-01'
 end_date: '2024-04-15'
-target_transform: log
+target_transform: null
 mask_loss: false
 min_news: 360
 max_news_daily: 5

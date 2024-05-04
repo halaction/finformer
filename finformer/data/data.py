@@ -403,7 +403,8 @@ class FinformerData:
         if self.config.params.target_transform is None:
             pass
         elif self.config.params.target_transform == 'log':
-            df = np.log1p(df)
+            positive_features = ['close', 'open', 'low', 'high', 'wvap', 'volume']
+            df.loc[:, positive_features] = np.log1p(df[positive_features])
         else:
             raise ValueError('Unknown target transform.')
         
