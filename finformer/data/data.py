@@ -385,11 +385,17 @@ class FinformerData:
 
         for feature in flow_features:
             if feature in features:
-                df.loc[:, feature].fillna(value=0, inplace=True)
+                df.loc[:, feature].fillna(0, inplace=True)
 
         for feature in stock_features:
             if feature in features:
                 df.loc[:, feature].fillna(df['_close'], inplace=True)
+
+        if 'change' in features:
+            df.loc[:, 'change'].fillna(df['close'] - df['open'], inplace=True)
+
+        if 'changePercent' in features:
+            df.loc[:, 'changePercent'].fillna(df['close'] / df['open'] - 1, inplace=True)
 
         df.drop(columns=['_close', ], inplace=True)
 
