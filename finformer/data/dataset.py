@@ -11,14 +11,14 @@ from finformer.data.data import FinformerData
 from finformer.utils import FinformerBatch, filter_none, get_device
 
 
-def get_split_dataset(config, data=None):
+def get_split_dataset(config, data=None, force=False):
 
     train_size = config.params.train_size
     val_size = config.params.val_size
     test_size = config.params.test_size
 
     if data is None:
-        data = FinformerData(config)
+        data = FinformerData(config, force=force)
 
     index_train, index_val, index_test = split_index(
         data._index, 

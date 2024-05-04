@@ -90,9 +90,8 @@ class SentimentModel(nn.Module):
             # TODO: Can this loop be automatized? 
             for batch_text_split, date_ids_split in zip(batch_text_splits, date_ids_splits):
 
-                with torch.no_grad():
-                    # [B, L] -> [B, D]
-                    sentiment_output_split = self.model(**batch_text_split).logits
+                # [B, L] -> [B, D]
+                sentiment_output_split = self.model(**batch_text_split).logits
                 
                 sentiment_output_split = sentiment_output_split
                 batch_sentiment.index_add_(dim=0, index=date_ids_split, source=sentiment_output_split)
@@ -103,7 +102,7 @@ class SentimentModel(nn.Module):
         # > Why would you pass prediction part to model at all then?
         
         # Future mask for news
-        if self.config.params.mask_loss:
+        if self.config.params.mask_sentiment:
             batch_sentiment[:, self.sequence_length:, :].fill_(float('nan'))
 
         return batch_sentiment
@@ -157,7 +156,7 @@ class TimeSeriesModel(nn.Module):
         batch_values = batch_num.pop('batch_values')
         batch_values = torch.cat([batch_values, batch_sentiment], dim=2)
 
-        observed_mask = batch_values.isnan()
+        observed_mask = ~ batch_values.isnan()
         batch_values.nan_to_num_()
 
         batch_num.past_values = batch_values[:, :self.sequence_length, :]

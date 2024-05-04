@@ -378,26 +378,21 @@ class FinformerData:
 
         df = df.reindex(index)
 
-        df['_close'] = df.groupby(level='ticker')['close'].ffill().bfill()
+        if self.config.params.fill_nan:
+            df['_close'] = df.groupby(level='ticker')['close'].ffill().bfill()
 
-        flow_features = ['change', 'changePercent', 'volume']
-        stock_features = ['close', 'open', 'low', 'high', 'wvap']
+            flow_features = ['change', 'changePercent', 'volume']
+            stock_features = ['close', 'open', 'low', 'high', 'wvap']
 
-        for feature in flow_features:
-            if feature in features:
-                df.loc[:, feature].fillna(0, inplace=True)
+            for feature in flow_features:
+                if feature in features:
+                    df.loc[:, feature].fillna(0, inplace=True)
 
-        for feature in stock_features:
-            if feature in features:
-                df.loc[:, feature].fillna(df['_close'], inplace=True)
+            for feature in stock_features:
+                if feature in features:
+                    df.loc[:, feature].fillna(df['_close'], inplace=True)
 
-        if 'change' in features:
-            df.loc[:, 'change'].fillna(df['close'] - df['open'], inplace=True)
-
-        if 'changePercent' in features:
-            df.loc[:, 'changePercent'].fillna(df['close'] / df['open'] - 1, inplace=True)
-
-        df.drop(columns=['_close', ], inplace=True)
+            df.drop(columns=['_close', ], inplace=True)
 
         # Transform target
         if self.config.params.target_transform is None:
@@ -415,6 +410,8 @@ class FinformerData:
     def get_calendar(self):
 
         df = pd.DataFrame(self.date_index, columns=['date'])
+
+        # TODO: Add trading days
 
         df['weekday'] = df['date'].dt.day_name()
         df['month'] = df['date'].dt.month_name()

@@ -1,6 +1,6 @@
 output_dir: trainer/default
 
-report_to: 'wandb'
+report_to: wandb
 run_name: trainer-default
 
 push_to_hub: true
@@ -34,8 +34,8 @@ log_level: info
 logging_strategy: steps
 logging_steps: 50
 
-save_strategy: epoch
-# save_steps: 500
+save_strategy: steps
+save_steps: 1000
 
-evaluation_strategy: epoch
-# eval_steps: 500
+evaluation_strategy: steps
+eval_steps: 1000

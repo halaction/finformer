@@ -76,7 +76,12 @@ def get_preprocess_logits_for_metrics(config):
 
 class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
 
-    def __init__(self, config: DictConfig = None):
+    def __init__(
+        self, 
+        train_dataset,
+        eval_dataset,
+        config: DictConfig = None
+    ):
         
         if config is None:
             config = get_config()
@@ -88,7 +93,6 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
 
         self._config = config
 
-        dataset_train, dataset_val, dataset_test = get_split_dataset(config)
         data_collator = FinformerCollator(config)
 
         model = FinformerModel(config)
@@ -108,11 +112,8 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
         super().__init__(
             model=model,
             args=training_args,
-            train_dataset=dataset_train,
-            eval_dataset={
-                'val': dataset_val, 
-                'test': dataset_test
-            },
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
             data_collator=data_collator,
             compute_metrics=compute_metrics,
             preprocess_logits_for_metrics=preprocess_logits_for_metrics,
@@ -180,8 +181,7 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
             future_values = inputs['batch_num']['batch_values'][:, self.sequence_length:, :]
         else:
             future_values = None
-
-
+        
         return loss, generated_values, future_values
 
         
