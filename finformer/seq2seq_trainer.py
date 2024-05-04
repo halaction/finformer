@@ -90,7 +90,6 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
         config.training_args.per_device_eval_batch_size = config.params.batch_size * 4
 
         self.sequence_length = config.params.context_length + config.params.max_lag
-
         self._config = config
 
         data_collator = FinformerCollator(config)

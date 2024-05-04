@@ -1,7 +1,8 @@
 output_dir: trainer/default
+overwrite_output_dir: true
 
 report_to: wandb
-run_name: trainer-default
+run_name: trainer
 
 push_to_hub: true
 hub_model_id: halaction/finformer-model
