@@ -27,7 +27,7 @@ def get_compute_metrics(config):
 
     metrics = [mape_metric, smape_metric, mse_metric, mae_metric]
 
-    positive_metrics = [mape_metric, smape_metric]
+    positive_metrics = ['mape', 'smape']
     positive_features = ['close', 'open', 'low', 'high', 'wvap', 'volume']
 
     def compute_metrics(eval_prediction):
@@ -49,9 +49,8 @@ def get_compute_metrics(config):
 
         for metric in metrics:
             for i, feature in enumerate(value_features):
-                if ((metrics in positive_metrics) and (feature in positive_features)) or (metrics not in positive_metrics):
-                    name = metric.name
-
+                name = metric.name
+                if (name in positive_metrics) == (feature in positive_features):
                     key = f'{name}/{feature}'
                     value = metric.compute(
                         predictions=future_values_pred[:, :, i].T, 
