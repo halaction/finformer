@@ -34,41 +34,40 @@ def get_split_dataset(config, data=None):
     return dataset_train, dataset_val, dataset_test
 
 
-def split_index(index, train_size=0.7, val_size=0.1, test_size=0.2, random_state=0):
+def split_index(index, train_size=None, val_size=90, test_size=360):
     
+    _, date_offsets = zip(index)
+    max_date_offset = max(date_offsets)
+
+    test_date_offset = max_date_offset - test_size
+    val_date_offset = test_date_offset - val_size
+    train_date_offset = 0 if train_size is None else val_date_offset - train_size
+
     index_set = set(index)
+    df_index = pd.DataFrame(index_set, columns=['ticker', 'date_offset'])
 
-    index_set_test = set(
-        pd.DataFrame(index_set, columns=['ticker', 'date_offset'])
-        .groupby(by='ticker')
-        .sample(frac=test_size, random_state=random_state)
+    index_train = sorted(list(set(
+        df_index[
+            (df_index['date_offset'] >= train_date_offset) 
+            & (df_index['date_offset'] < val_date_offset)
+        ]
         .itertuples(index=False, name=None)
-    )
+    )))
 
-    index_set = index_set - index_set_test
-
-    index_set_val = set(
-        pd.DataFrame(index_set, columns=['ticker', 'date_offset'])
-        .groupby(by='ticker')
-        .sample(frac=val_size / (1 - test_size), random_state=random_state)
+    index_val = sorted(list(set(
+        df_index[
+            (df_index['date_offset'] >= val_date_offset) 
+            & (df_index['date_offset'] < test_date_offset)
+        ]
         .itertuples(index=False, name=None)
-    )
+    )))
 
-    index_set = index_set - index_set_val
-
-    if train_size + val_size + test_size == 1:
-        index_set_train = index_set
-    else:
-        index_set_train = set(
-            pd.DataFrame(index_set, columns=['ticker', 'date_offset'])
-            .groupby(by='ticker')
-            .sample(frac=train_size / (1 - test_size - val_size), random_state=random_state)
-            .itertuples(index=False, name=None)
-        )
-
-    index_train = sorted(list(index_set_train))
-    index_val = sorted(list(index_set_val))
-    index_test = sorted(list(index_set_test))
+    index_test = sorted(list(set(
+        df_index[
+            df_index['date_offset'] >= test_date_offset
+        ]
+        .itertuples(index=False, name=None)
+    )))
 
     return index_train, index_val, index_test
 

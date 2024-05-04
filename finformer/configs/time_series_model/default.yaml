@@ -6,7 +6,7 @@ model:
     prediction_length: null
     distribution_output: student_t
     loss: nll
-    scaling: mean
+    scaling: null
     input_size: null
     lags_sequence: null
     num_time_features: null

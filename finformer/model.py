@@ -90,7 +90,8 @@ class SentimentModel(nn.Module):
         # > Why would you pass prediction part to model at all then?
         
         # Future mask for news
-        batch_sentiment[:, self.sequence_length:, :].fill_(float('nan'))
+        if self.config.params.mask_loss:
+            batch_sentiment[:, self.sequence_length:, :].fill_(float('nan'))
 
         return batch_sentiment
 

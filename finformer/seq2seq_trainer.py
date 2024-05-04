@@ -15,10 +15,10 @@ from finformer.data.dataset import FinformerCollator, get_split_dataset
 from finformer.model import FinformerModel
 
 
-mape_metric = load("evaluate-metric/mape", "multilist")
-smape_metric = load("evaluate-metric/smape", "multilist")
-mse_metric = load("evaluate-metric/mse", "multilist")
-mae_metric = load("evaluate-metric/mae", "multilist")
+mape_metric = load('evaluate-metric/mape', 'multilist')
+smape_metric = load('evaluate-metric/smape', 'multilist')
+mse_metric = load('evaluate-metric/mse', 'multilist')
+mae_metric = load('evaluate-metric/mae', 'multilist')
 
 metrics = [mape_metric, smape_metric, mse_metric, mae_metric]
 
@@ -132,58 +132,56 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
                 model, inputs, prediction_loss_only=prediction_loss_only, ignore_keys=ignore_keys
             )
 
-        has_labels = "batch_num" in inputs
+        has_future_values = 'batch_values' in inputs.batch_num
         inputs = self._prepare_inputs(inputs)
 
-        if len(gen_kwargs) == 0 and hasattr(self, "_gen_kwargs"):
+        if len(gen_kwargs) == 0 and hasattr(self, '_gen_kwargs'):
             gen_kwargs = self._gen_kwargs.copy()
-        if "num_beams" in gen_kwargs and gen_kwargs["num_beams"] is None:
-            gen_kwargs.pop("num_beams")
-        if "max_length" in gen_kwargs and gen_kwargs["max_length"] is None:
-            gen_kwargs.pop("max_length")
+        if 'num_beams' in gen_kwargs and gen_kwargs['num_beams'] is None:
+            gen_kwargs.pop('num_beams')
+        if 'max_length' in gen_kwargs and gen_kwargs['max_length'] is None:
+            gen_kwargs.pop('max_length')
 
-        # default_synced_gpus = True if is_deepspeed_zero3_enabled() else False
         default_synced_gpus = False
-        gen_kwargs["synced_gpus"] = (
-            gen_kwargs["synced_gpus"] if gen_kwargs.get("synced_gpus") is not None else default_synced_gpus
+        gen_kwargs['synced_gpus'] = (
+            gen_kwargs['synced_gpus'] if gen_kwargs.get('synced_gpus') is not None else default_synced_gpus
         )
 
         generation_inputs = inputs.copy()
 
         if (
-            "future_values" in generation_inputs
-            and "decoder_input_ids" in generation_inputs
-            and generation_inputs["future_values"].shape == generation_inputs["decoder_input_ids"].shape
+            'future_values' in generation_inputs
+            and 'decoder_input_ids' in generation_inputs
+            and generation_inputs['future_values'].shape == generation_inputs['decoder_input_ids'].shape
         ):
             generation_inputs = {
-                k: v for k, v in inputs.items() if k not in ("decoder_input_ids", "decoder_attention_mask")
+                k: v for k, v in inputs.items() if k not in ('decoder_input_ids', 'decoder_attention_mask')
             }
 
-        generated_tokens = self.model.generate(**generation_inputs, **gen_kwargs)
+        generated_values = self.model.generate(**generation_inputs, **gen_kwargs)
 
         if self.model.generation_config._from_model_config:
             self.model.generation_config._from_model_config = False
 
         with torch.no_grad():
-            if has_labels:
+            if has_future_values:
                 with self.compute_loss_context_manager():
                     outputs = model(**inputs)
-                if self.label_smoother is not None:
-                    loss = self.label_smoother(outputs, inputs["labels"]).mean().detach()
-                else:
-                    loss = (outputs["loss"] if isinstance(outputs, dict) else outputs[0]).mean().detach()
+                
+                loss = (outputs.loss if isinstance(outputs, dict) else outputs[0]).mean().detach()
+                    
             else:
                 loss = None
 
         if self.args.prediction_loss_only:
             return loss, None, None
 
-        if has_labels:
-            labels = inputs['batch_num']['batch_values'][:, self.sequence_length:, :]
+        if has_future_values:
+            future_values = inputs['batch_num']['batch_values'][:, self.sequence_length:, :]
         else:
-            labels = None
+            future_values = None
 
 
-        return loss, generated_tokens, labels
+        return loss, generated_values, future_values
 
         

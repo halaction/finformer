@@ -28,7 +28,8 @@ class FinformerData:
 
         # self.features = self._get_features()
 
-        login()
+        hf_token = os.environ['HF_TOKEN']
+        login(hf_token=hf_token)
 
         self.load(force=force)
         self.save(force=force)
