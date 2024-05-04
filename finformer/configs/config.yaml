@@ -57,3 +57,12 @@ fmp:
       symbol: null
     query_params:
       apikey: null
+  dividends:
+    dir: ./data/fmp/profile
+    separate: false
+    endpoint: v3/historical-price-full/stock_dividend
+    path_params:
+      symbol: null
+    query_params:
+      apikey: null
+

@@ -8,13 +8,14 @@ from enum import Enum
 import pandas as pd
 import json
 
+from finformer.config import get_config
 from finformer.utils import FinformerConfig, adaptive_get
 
 
 load_dotenv()
 API_KEY = os.environ['FMP_API_KEY']
 
-config = FinformerConfig()
+config = get_config()
 fmp_config = config.fmp
 
 DATA_DIR = config.dirs.data_dir
@@ -270,6 +271,114 @@ def load_profile(tickers, force=False, timeout=10):
                     if len(data) == 0:
                         data = [{'symbol': ticker}, ]
 
+                    key_list.extend(data)
+
+                except requests.exceptions.Timeout:
+                    retry_tickers.append(ticker)
+
+                if (i + 1) % 100 == 0:
+                    sleep(1)
+
+        if len(retry_tickers) > 0:
+
+            with tqdm(enumerate(retry_tickers), total=len(retry_tickers)) as progress_bar:
+                for i, ticker in progress_bar:
+                    progress_bar.set_description(desc=f'RETRYING (endpoint={endpoint} | ticker={ticker})')
+
+                    path_params['symbol'] = ticker
+
+                    query = get_query(path_params, query_params)
+                    url = get_url(endpoint, query)
+
+                    try:
+                        response = requests.get(url, timeout=timeout)
+                        data = response.json()
+
+                        if len(data) == 0:
+                            data = [{'symbol': ticker}, ]
+
+                        key_list.extend(data)
+
+                    except requests.exceptions.Timeout:
+                        failed_tickers.append(ticker)
+
+                    if (i + 1) % 100 == 0:
+                        sleep(1)
+
+        print(key_list)
+
+        key_df = pd.DataFrame(key_list)
+
+        print(key_df)
+
+        print(len(key_df))
+
+        key_path = os.path.join(dir, f'{key}.csv')
+        if os.path.exists(key_path):
+            recorded_key_df = pd.read_csv(key_path)
+            key_df = pd.concat([key_df, recorded_key_df], axis=0, ignore_index=True)
+
+        print(len(key_df))
+
+        key_df.drop_duplicates(inplace=True)
+
+        print(len(key_df))
+
+        key_df.to_csv(key_path, index=False)
+
+        status = check_failed_tickers(key, failed_tickers)
+
+    report = get_report(endpoint, status)
+    print(report)
+
+    return dir
+
+
+
+
+
+def load_dividends(tickers, force=False, timeout=10):
+
+    key = 'dividends'
+    key_list = []
+
+    key_config = fmp_config[key]
+
+    dir = key_config['dir']
+    endpoint = key_config['endpoint']
+
+    path_params = key_config['path_params']
+
+    query_params = key_config['query_params']
+    query_params['apikey'] = API_KEY
+
+    status, tickers = check_tickers(key, tickers, force=force)
+
+    if status is not Status.EXISTS:
+
+        retry_tickers = []
+        failed_tickers = []
+
+        with tqdm(enumerate(tickers), total=len(tickers)) as progress_bar:
+            for i, ticker in progress_bar:
+                progress_bar.set_description(desc=f'CALLING (endpoint={endpoint} | ticker={ticker})')
+
+                path_params['symbol'] = ticker
+
+                query = get_query(path_params, query_params)
+                url = get_url(endpoint, query)
+
+                try:
+                    response = requests.get(url, timeout=timeout)
+                    data = response.json()['historical']
+
+                    if len(data) == 0:
+                        data = [{'symbol': ticker}, ]
+                        key_df = pd.DataFrame(data)
+                    else:
+                        key_df = pd.DataFrame(data)
+                        key_df['symbol'] = ticker
+                    
                     key_list.extend(data)
 
                 except requests.exceptions.Timeout:
