@@ -377,7 +377,15 @@ class FinformerData:
         )
 
         df = df.reindex(index)
-        df = df.groupby(level='ticker').ffill().bfill()
+
+        df['close'] = df.groupby(level='ticker')['close'].ffill().bfill()
+
+        if 'volume' in features:
+            df.fillna(value={
+                'volume': 0,
+            })
+
+        df.loc[:, ['open', 'low', 'high']].fillna(df['close'], inplace=True)
 
         # Transform target
         if self.config.params.target_transform is None:
