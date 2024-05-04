@@ -57,3 +57,5 @@ value_features:
 - low
 - high
 - volume
+- change
+- changePercent
