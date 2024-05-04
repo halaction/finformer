@@ -379,20 +379,33 @@ class FinformerData:
         df = df.reindex(index)
 
         if self.config.params.fill_nan:
-            df['_close'] = df.groupby(level='ticker')['close'].ffill().bfill()
 
-            flow_features = ['change', 'changePercent', 'volume']
-            stock_features = ['close', 'open', 'low', 'high', 'wvap']
-
-            for feature in flow_features:
+            change_features = ['change', 'changePercent']
+            for feature in change_features:
                 if feature in features:
                     df.loc[:, feature].fillna(0, inplace=True)
 
-            for feature in stock_features:
-                if feature in features:
-                    df.loc[:, feature].fillna(df['_close'], inplace=True)
+            
 
-            df.drop(columns=['_close', ], inplace=True)
+            if 'close' in features:
+                df['_close'] = df.groupby(level='ticker')['close'].ffill().bfill()
+                
+                price_features = ['close', 'open', 'low', 'high', 'wvap']
+                for feature in price_features:
+                    if feature in features:
+                        df.loc[:, feature].fillna(df['_close'], inplace=True)
+
+                df.drop(columns=['_close', ], inplace=True)
+
+            if 'volume' in features:
+                df['_volume'] = df.groupby(level='ticker')['volume'].ffill().bfill()
+
+                volume_features = ['volume', ]
+                for feature in volume_features:
+                    if feature in features:
+                        df.loc[:, feature].fillna(df['_volume'], inplace=True)
+
+                df.drop(columns=['_volume', ], inplace=True)
 
         # Transform target
         if self.config.params.target_transform is None:

@@ -103,7 +103,7 @@ class SentimentModel(nn.Module):
         
         # Future mask for news
         if self.config.params.mask_sentiment:
-            batch_sentiment[:, self.sequence_length:, :].fill_(float('nan'))
+            batch_sentiment[:, (self.sequence_length + 1):, :].fill_(float('nan'))
 
         return batch_sentiment
 

@@ -15,19 +15,20 @@ from finformer.data.dataset import FinformerCollator, get_split_dataset
 from finformer.model import FinformerModel
 
 
-mape_metric = load('evaluate-metric/mape', 'multilist')
-smape_metric = load('evaluate-metric/smape', 'multilist')
-mse_metric = load('evaluate-metric/mse', 'multilist')
-mae_metric = load('evaluate-metric/mae', 'multilist')
-
-metrics = [mape_metric, smape_metric, mse_metric, mae_metric]
-
-
 def get_compute_metrics(config):
 
     value_features = config.features.value_features
-    n_value_features = len(value_features)
     target_transform = config.params.target_transform
+
+    mape_metric = load('evaluate-metric/mape', 'multilist')
+    smape_metric = load('evaluate-metric/smape', 'multilist')
+    mse_metric = load('evaluate-metric/mse', 'multilist')
+    mae_metric = load('evaluate-metric/mae', 'multilist')
+
+    metrics = [mape_metric, smape_metric, mse_metric, mae_metric]
+
+    positive_metrics = [mape_metric, smape_metric]
+    positive_features = ['close', 'open', 'low', 'high', 'wvap', 'volume']
 
     def compute_metrics(eval_prediction):
 
@@ -37,24 +38,27 @@ def get_compute_metrics(config):
         if target_transform is None:
             pass
         elif target_transform == 'log':
-            future_values_pred[:, :, :n_value_features] = np.expm1(future_values_pred)
-            future_values = np.expm1(future_values)
+            for i, feature in value_features:
+                if feature in positive_features:
+                    future_values_pred[:, :, i] = np.expm1(future_values_pred[:, :, i])
+                    future_values[:, :, i] = np.expm1(future_values[:, :, i])
         else:
             raise ValueError('Unknown target transform.')
 
         metrics_values = dict()
 
         for metric in metrics:
-            for i, value_feature in enumerate(value_features):
-                name = metric.name
+            for i, feature in enumerate(value_features):
+                if ((metrics in positive_metrics) and (feature in positive_features)) or (metrics not in positive_metrics):
+                    name = metric.name
 
-                key = f'{name}/{value_feature}'
-                value = metric.compute(
-                    predictions=future_values_pred[:, :, i].T, 
-                    references=future_values[:, :, i].T
-                )[name]
+                    key = f'{name}/{feature}'
+                    value = metric.compute(
+                        predictions=future_values_pred[:, :, i].T, 
+                        references=future_values[:, :, i].T
+                    )[name]
 
-                metrics_values[key] = value
+                    metrics_values[key] = value
 
         return metrics_values
     
