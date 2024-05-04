@@ -35,20 +35,33 @@ class SentimentModel(nn.Module):
         if config.sentiment_model.output_type == 'logits':
             pass
         elif config.sentiment_model.output_type == 'features':
-            model.classifier = nn.Linear(model.config.hidden_size, config.sentiment_model.output_size)
+            model.classifier = nn.Sequential(
+                nn.Linear(model.config.hidden_size, 4 * config.sentiment_model.output_size),
+                nn.Linear(4 * config.sentiment_model.output_size, config.sentiment_model.output_size),
+            )
         else:
             raise ValueError(f'Unknown output_type `{config.sentiment_model.output_type}`.')
+        
+        if config.sentiment_model.output_type == 'features':
+            
+            if config.sentiment_model.training_type == 'probing':
+                for name, param in model.named_parameters():
+                    if not name.startswith('classifier'):
+                        param.requires_grad = False
 
-        peft_config = LoraConfig(
-            task_type=TaskType.SEQ_CLS, 
-            inference_mode=False, 
-            r=8, 
-            lora_alpha=32, 
-            lora_dropout=0.1
-        )
-
-        model = get_peft_model(model, peft_config)
-        model.print_trainable_parameters()
+            elif config.sentiment_model.training_type == 'lora':
+                peft_config = LoraConfig(
+                    task_type=TaskType.SEQ_CLS, 
+                    inference_mode=False, 
+                    r=8, 
+                    lora_alpha=32, 
+                    lora_dropout=0.1
+                )
+                model = get_peft_model(model, peft_config)
+                model.print_trainable_parameters()
+            
+            else: 
+                raise ValueError(f'Unknown training_type `{config.sentiment_model.training_type}`.')
 
         return model
 

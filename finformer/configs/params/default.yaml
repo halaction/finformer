@@ -1,5 +1,5 @@
 batch_size: 16
-train_size: 360
+train_size: null
 val_size: 90
 test_size: 360
 context_length: 30

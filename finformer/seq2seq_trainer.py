@@ -132,7 +132,7 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
                 model, inputs, prediction_loss_only=prediction_loss_only, ignore_keys=ignore_keys
             )
 
-        has_future_values = 'batch_values' in inputs.batch_num
+        has_future_values = 'batch_values' in inputs['batch_num']
         inputs = self._prepare_inputs(inputs)
 
         if len(gen_kwargs) == 0 and hasattr(self, '_gen_kwargs'):
