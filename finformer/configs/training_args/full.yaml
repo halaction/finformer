@@ -1,4 +1,5 @@
 output_dir: trainer/full
+overwrite_output_dir: true
 
 report_to: 'wandb'
 run_name: trainer-full
