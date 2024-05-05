@@ -24,13 +24,13 @@ weight_decay: 0.01
 max_grad_norm: 1
 
 gradient_accumulation_steps: 4
-gradient_checkpointing: true
-auto_find_batch_size: true
+gradient_checkpointing: false
+auto_find_batch_size: false
 
 lr_scheduler_type: constant_with_warmup
 warmup_steps: 300
 
-fp16: true
+fp16: false
 half_precision_backend: auto
 
 log_level: debug
@@ -39,7 +39,7 @@ logging_strategy: steps
 logging_steps: 50
 
 save_strategy: steps
-save_steps: 500
+save_steps: 0.1
 
 evaluation_strategy: steps
-eval_steps: 500
+eval_steps: 0.1
