@@ -205,6 +205,8 @@ class FinformerCollator:
         batch_text_splits, date_ids_splits = self._collate_batch_text(batch_text, date_ids)
         batch_num = self._collate_batch_num(batch_num)
 
+        ids = torch.tensor(ids, dtype=torch.int32)
+
         collated_batch = dict(
             batch_text_splits=batch_text_splits,
             date_ids_splits=date_ids_splits,
