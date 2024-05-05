@@ -10,6 +10,6 @@ end_date: '2024-04-15'
 target_transform: null
 mask_sentiment: false
 fill_nan: true
-min_news: 360
+min_news: 1000
 max_news_daily: 5
 min_trading_days: 720

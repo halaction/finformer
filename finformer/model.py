@@ -88,6 +88,7 @@ class SentimentModel(nn.Module):
             for batch_text_split, date_ids_split in zip(batch_text_splits, date_ids_splits):
                 # [B, L] -> [B, D]
                 sentiment_output_split = self.model(**batch_text_split).logits
+                
                 batch_sentiment.index_add_(dim=0, index=date_ids_split, source=sentiment_output_split)
             
         batch_sentiment = batch_sentiment.view(batch_size, self.window_length, self.output_size)
