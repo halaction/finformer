@@ -1,0 +1,15 @@
+batch_size: 16
+train_size: null
+val_size: 90
+test_size: 180
+context_length: 30
+prediction_length: 15
+max_lag: 3
+start_date: '2020-01-01'
+end_date: '2024-04-15'
+target_transform: null
+mask_sentiment: false
+fill_nan: true
+min_news: 360
+max_news_daily: 5
+min_trading_days: 720

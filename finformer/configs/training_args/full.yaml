@@ -15,10 +15,10 @@ label_names:
 per_device_train_batch_size: null
 per_device_eval_batch_size: null
 
-num_train_epochs: 25
+num_train_epochs: 10
 max_steps: -1
 
-learning_rate: 0.00005
+learning_rate: 0.0003
 weight_decay: 0.01
 max_grad_norm: 1
 gradient_accumulation_steps: 1
@@ -34,8 +34,8 @@ log_level: debug
 logging_strategy: steps
 logging_steps: 50
 
-save_strategy: epoch
-# save_steps: 500
+save_strategy: steps
+save_steps: 500
 
-evaluation_strategy: epoch
-# eval_steps: 500
+evaluation_strategy: steps
+eval_steps: 500
