@@ -98,10 +98,11 @@ class FinformerSeq2SeqTrainer(Seq2SeqTrainer):
         data_collator = FinformerCollator(config)
 
         model = FinformerModel(config)
+        model.main_input_name = 'ids'
 
         training_args = Seq2SeqTrainingArguments(
             **config.training_args,
-            include_inputs_for_metrics=False,
+            include_inputs_for_metrics=True,
             predict_with_generate=True,
             generation_max_length=config.params.prediction_length,
             generation_num_beams=1,

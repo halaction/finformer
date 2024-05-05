@@ -2,5 +2,6 @@ model:
   name: prajjwal1/bert-tiny
 output_size: 3
 output_type: features
+training_type: lora
 max_batch_size: 32
 max_length: 128

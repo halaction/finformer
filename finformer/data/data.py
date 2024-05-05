@@ -43,8 +43,8 @@ class FinformerData:
 
         ticker_index = self.tickers
         
-        n_dates = (self.end_date - self.start_date).days - self.batch_length + 1 
-        date_offset_index = list(range(0, n_dates, self.batch_length))
+        n_dates = (self.end_date - self.start_date).days - self.prediction_length + 1 
+        date_offset_index = list(range(0, n_dates, self.prediction_length))
 
         index = list(product(ticker_index, date_offset_index))
 
