@@ -53,7 +53,7 @@ class SentimentModel(nn.Module):
                 peft_config = LoraConfig(
                     task_type=TaskType.SEQ_CLS, 
                     inference_mode=False, 
-                    r=8, 
+                    r=16, 
                     lora_alpha=32, 
                     lora_dropout=0.1
                 )
