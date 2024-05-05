@@ -26,8 +26,6 @@ class SentimentModel(nn.Module):
         self.window_length = self.sequence_length + self.prediction_length
         self.output_size = config.sentiment_model.output_size
 
-        self.register_buffer('batch_sentiment', torch.zeros(size=(self.batch_size * self.window_length, self.output_size)))
-
     def init_model(self, config):
         
         model = AutoModelForSequenceClassification.from_pretrained(config.sentiment_model.model.name)
@@ -75,25 +73,21 @@ class SentimentModel(nn.Module):
         dtype = batch_values.dtype
         device = batch_values.device
 
-        #batch_sentiment = self.batch_output
-        #batch_sentiment.fill_(0)
-        
-        #batch_sentiment = self.batch_sentiment.detach().clone()
         batch_sentiment = torch.zeros(
             size=(batch_size * self.window_length, self.output_size),
             dtype=dtype,
             device=device,
         )
 
+        if self.config.training_args.fp16:
+            batch_sentiment = batch_sentiment.half()
+
         if len(batch_text_splits) > 0: 
             
             # TODO: Can this loop be automatized? 
             for batch_text_split, date_ids_split in zip(batch_text_splits, date_ids_splits):
-
                 # [B, L] -> [B, D]
                 sentiment_output_split = self.model(**batch_text_split).logits
-                
-                sentiment_output_split = sentiment_output_split
                 batch_sentiment.index_add_(dim=0, index=date_ids_split, source=sentiment_output_split)
             
         batch_sentiment = batch_sentiment.view(batch_size, self.window_length, self.output_size)

@@ -27,7 +27,7 @@ gradient_accumulation_steps: 1
 lr_scheduler_type: constant_with_warmup
 warmup_steps: 300
 
-fp16: false
+fp16: true
 half_precision_backend: auto
 
 log_level: debug
