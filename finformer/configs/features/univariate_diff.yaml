@@ -52,4 +52,4 @@ time_features:
 - quarter_3
 - quarter_4
 value_features:
-- change_percent
+- changePercent
